@@ -72,7 +72,7 @@ const routes = [
     component: <Applications />,
   },
   {
-    name: "Sign In",
+    name: "Kirish",
     layout: "/auth",
     path: "sign-in",
   icon: <Login size={20} />,
