@@ -67,14 +67,19 @@ export function isPending(status?: string | null): boolean {
 export function appStatusBadge(status?: string | null) {
   const s = (status ?? "").toUpperCase();
   
-  // Tugatilgan - Approved statuses
-  if (s === "CONFIRMED" || s === "FINISHED") {
+  // Tugatilgan - Approved/Completed statuses
+  if (s === "CONFIRMED" || s === "FINISHED" || s === "COMPLETED" || s === "ACTIVE") {
     return { label: "TUGATILGAN", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
   }
   
-  // Rad qilingan - Rejected statuses
-  if (s.includes("CANCELED") || s === "SCORING RAD ETDI" || s === "DAILY RAD ETDI" || s.includes("RAD")) {
-    return { label: "RAD QILINDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  // Rad qilingan - Rejected/Cancelled statuses
+  if (s.includes("CANCELED") || s === "SCORING RAD ETDI" || s === "DAILY RAD ETDI" || s.includes("RAD") || s === "REJECTED" || s.includes("SCORING")) {
+    return { label: "RAD QILINGAN", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  }
+  
+  // Limit - Limit statuses
+  if (s === "LIMIT" || s.includes("LIMIT")) {
+    return { label: "LIMIT", className: "inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-800 dark:text-orange-300" };
   }
   
   // Kutilmoqda - All other statuses (pending, waiting, etc)

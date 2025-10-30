@@ -54,11 +54,19 @@ const Dashboard = (): JSX.Element => {
   // fetch global counts for dashboard widgets with filters applied
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
+    const abortController = new AbortController();
+    
+    // Add debounce to prevent rapid successive calls
+    const fetchData = async () => {
+      if (!mounted || abortController.signal.aborted) return;
+      
       try {
-        const apps = await api.listApplications({ page: 1, pageSize: 10000 });
-        const users = await api.listUsers({ page: 1, pageSize: 10000 });
-        if (!mounted) return;
+        const [apps, users] = await Promise.all([
+          api.listApplications({ page: 1, pageSize: 10000 }),
+          api.listUsers({ page: 1, pageSize: 10000 })
+        ]);
+        
+        if (!mounted || abortController.signal.aborted) return;
 
         // Apply filters to applications
         let filteredApps = apps?.items || [];
@@ -158,11 +166,20 @@ const Dashboard = (): JSX.Element => {
         }, 0);
         setTotalProducts(prodCount);
 
-      } catch (e) {
+      } catch (e: any) {
+        if (!mounted || abortController.signal.aborted) return;
+        if (e.name === 'AbortError') return;
         console.error("Error loading dashboard data:", e);
       }
-    })();
-    return () => { mounted = false; };
+    };
+    
+    const timeoutId = setTimeout(fetchData, 100);
+    
+    return () => { 
+      mounted = false; 
+      abortController.abort();
+      clearTimeout(timeoutId);
+    };
   }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth]);
 
   // metrics are provided by the reusable dashboard components in ./components

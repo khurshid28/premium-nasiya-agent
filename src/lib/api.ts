@@ -63,15 +63,29 @@ async function handleResponse<T>(res: Response): Promise<T> {
 async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
   let lastError: Error | null = null;
   
+  // Add cache-busting parameter to force fresh requests and avoid cached CORS issues
+  const separator = url.includes('?') ? '&' : '?';
+  const cacheBustUrl = `${url}${separator}_t=${Date.now()}`;
+  
   for (let i = 0; i <= retries; i++) {
     try {
-      const res = await fetch(url, options);
+      // Check if request was aborted before making the call
+      if (options.signal?.aborted) {
+        throw new DOMException('Request was aborted', 'AbortError');
+      }
+      
+      const res = await fetch(cacheBustUrl, options);
       return res;
     } catch (error) {
       lastError = error as Error;
       
+      // If request was aborted, don't retry
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error;
+      }
+      
       // Check if this is a network error that should be retried
-      if (isNetworkError(error) && i < retries) {
+      if (isNetworkError(error) && i < retries && !options.signal?.aborted) {
         // Network error - retry with exponential backoff
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
         continue;
@@ -157,14 +171,33 @@ export async function listUsers(opts?: {
     params.fillialId = opts.fillialId;
   }
   const url = `${API_BASE}/user/all${qs(params)}`;
-  const res = await fetch(url, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
-      ...authHeaders() 
-    } 
+  
+  // Minimal headers to avoid CORS issues
+  const headers: Record<string, string> = {};
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const res = await fetchWithRetry(url, { 
+    method: 'GET',
+    headers
   });
-  return handleResponse<Paginated<User>>(res);
+  
+  const result = await handleResponse<any>(res);
+  
+  // If API returns array directly, return all data for client-side pagination
+  if (Array.isArray(result)) {
+    return {
+      items: result, // Barcha ma'lumotlarni qaytarish
+      total: result.length,
+      page: opts?.page || 1,
+      pageSize: opts?.pageSize || 5
+    };
+  }
+  
+  // If API returns pagination format, return as is
+  return result;
 }
 
 export async function getUser(id: number): Promise<User> {
@@ -206,14 +239,44 @@ export async function listFillials(opts?: { page?: number; pageSize?: number; se
   if (opts?.search) params.search = opts.search;
   if (opts?.region) params.region = opts.region;
   const url = `${API_BASE}/fillial/all${qs(params)}`;
-  const res = await fetch(url, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
-      ...authHeaders() 
-    } 
+  
+  // Minimal headers to avoid CORS issues
+  const headers: Record<string, string> = {};
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  console.log('API Call: Fillials URL:', url);
+  console.log('API Call: Fillials params:', params);
+  console.log('API Call: Fillials headers:', headers);
+  
+  const res = await fetchWithRetry(url, { 
+    method: 'GET',
+    headers
   });
-  return handleResponse<Paginated<Fillial>>(res);
+  
+  console.log('API Response: Status:', res.status);
+  console.log('API Response: Headers:', Object.fromEntries(res.headers.entries()));
+  
+  const result = await handleResponse<any>(res);
+  console.log('API Response: Fillials raw result:', result);
+  console.log('API Response: Result type:', typeof result);
+  console.log('API Response: Is Array:', Array.isArray(result));
+  
+  // If API returns array directly, return all data for client-side pagination
+  if (Array.isArray(result)) {
+    console.log('API returned array, returning all data for client-side pagination');
+    return {
+      items: result, // Barcha ma'lumotlarni qaytarish
+      total: result.length,
+      page: opts?.page || 1,
+      pageSize: opts?.pageSize || 5
+    };
+  }
+  
+  // If API returns pagination format, return as is
+  return result;
 }
 
 export async function getFillial(id: number): Promise<Fillial> {
@@ -255,14 +318,33 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
   if (opts?.search) params.search = opts.search;
   if (opts?.status) params.status = opts.status;
   const url = `${API_BASE}/app/all${qs(params)}`;
-  const res = await fetch(url, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
-      ...authHeaders() 
-    } 
+  
+  // Minimal headers to avoid CORS issues
+  const headers: Record<string, string> = {};
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const res = await fetchWithRetry(url, { 
+    method: 'GET',
+    headers
   });
-  return handleResponse<Paginated<Zayavka>>(res);
+  
+  const result = await handleResponse<any>(res);
+  
+  // If API returns array directly, return all data for client-side pagination
+  if (Array.isArray(result)) {
+    return {
+      items: result, // Barcha ma'lumotlarni qaytarish
+      total: result.length,
+      page: opts?.page || 1,
+      pageSize: opts?.pageSize || 5
+    };
+  }
+  
+  // If API returns pagination format, return as is
+  return result;
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {

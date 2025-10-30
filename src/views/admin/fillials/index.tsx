@@ -36,89 +36,19 @@ type Fillial = {
   updatedAt?: string | null;
 };
 
-const initialData: Fillial[] = [
-  {
-    id: 1,
-    name: "Main Branch",
-    image: null,
-    address: "123 Central St.",
-    region: "TASHKENT",
-    work_status: "WORKING",
-  merchant: { id: 10, name: "ACME Retail" },
-    nds: "15%",
-    hisob_raqam: "1234567890",
-    bank_name: "Asaka Bank",
-    mfo: "012345",
-    inn: "998877665",
-    director_name: "Jamshid Usmanov",
-    director_phone: "+998901112233",
-    percent_type: "OUT",
-    expired_months: ["2025-10", "2025-11"],
-    cashback_percent: 2.5,
-    cashback_amount: 10000,
-    max_amount: 50000000,
-    timeout: 600,
-    createdAt: new Date().toISOString(),
-    updatedAt: null,
-  },
-  {
-    id: 2,
-    name: "East Branch",
-    image: null,
-    address: "45 East Ave",
-    region: "SAMARKAND",
-    work_status: "WORKING",
-  merchant: { id: 10, name: "ACME Retail" },
-    nds: "15%",
-    hisob_raqam: "2233445566",
-    bank_name: "Ipak Yuli",
-    mfo: "065432",
-    inn: "112233445",
-    director_name: "Dilshod Bek",
-    director_phone: "+998901112234",
-    percent_type: "OUT",
-    expired_months: ["2025-12"],
-    cashback_percent: 1.0,
-    cashback_amount: 5000,
-    max_amount: 30000000,
-    timeout: 600,
-    createdAt: new Date().toISOString(),
-    updatedAt: null,
-  },
-  {
-    id: 3,
-    name: "West Branch",
-    image: null,
-    address: "7 West Road",
-    region: "BUKHARA",
-    work_status: "CLOSED",
-  merchant: { id: 10, name: "ACME Retail" },
-    nds: "15%",
-    hisob_raqam: "3344556677",
-    bank_name: "Xalq Bank",
-    mfo: "078901",
-    inn: "556677889",
-    director_name: "Nodir Karimov",
-    director_phone: "+998901112235",
-    percent_type: "IN",
-    expired_months: [],
-    cashback_percent: 0,
-    cashback_amount: 0,
-    max_amount: 5000000,
-    timeout: 300,
-    createdAt: new Date().toISOString(),
-    updatedAt: null,
-  },
-];
+
 
 const Fillials = (): JSX.Element => {
-  const [data, setData] = React.useState<Fillial[]>(initialData);
+  const [data, setData] = React.useState<Fillial[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [total, setTotal] = React.useState(0);
+  
   const [search, setSearch] = React.useState("");
   const [regionFilter, setRegionFilter] = React.useState("all");
   
   // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
-  const [pageSize, setPageSize] = React.useState<number>(10);
+  const [pageSize, setPageSize] = React.useState<number>(5);
   
   const [selected, setSelected] = React.useState<Fillial | null>(null);
   const [open, setOpen] = React.useState(false);
@@ -128,26 +58,15 @@ const Fillials = (): JSX.Element => {
   const [toastMessage, setToastMessage] = React.useState("");
   const [toastType, setToastType] = React.useState<"main" | "success" | "error">("main");
 
+  // Create a ref to store the latest abort controller
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
   const regions = React.useMemo(() => {
     const set = new Set<string>();
     const fillials = Array.isArray(data) ? data : [];
     fillials.forEach((d) => { if (d.region) set.add(d.region); });
     return Array.from(set).sort();
   }, [data]);
-
-  const filtered = React.useMemo(() => {
-    const s = search.trim().toLowerCase();
-    const fillials = Array.isArray(data) ? data : [];
-    return fillials.filter((d) => {
-      const matchesSearch =
-        !s || d.name.toLowerCase().includes(s) || (d.region ?? "").toLowerCase().includes(s);
-      const matchesRegion = regionFilter === "all" || d.region === regionFilter;
-      return matchesSearch && matchesRegion;
-    });
-  }, [data, search, regionFilter]);
-
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // Reset to page 1 when filters change
   React.useEffect(() => {
@@ -156,33 +75,144 @@ const Fillials = (): JSX.Element => {
 
   React.useEffect(() => {
     let mounted = true;
-    console.log('Fetching fillials from API...');
-    api.listFillials({})
-      .then((res) => {
-        if (!mounted) return;
-        console.log('Fillials response:', res);
-        setData(res?.items || []);
-      })
-      .catch((err) => {
-        if (!mounted) return;
-        console.error("Error fetching fillials:", err);
-        console.error("Error details:", {
-          message: err.message,
-          status: err.status,
-          body: err.body
-        });
-        setData([]);
-      });
+    
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
+    // Add a small delay to prevent rapid successive calls
+    const timeoutId = setTimeout(() => {
+      if (!mounted || abortController.signal.aborted) return;
+      
+      setLoading(true);
+      console.log('Fetching fillials from API...');
+      
+      // Create a promise that can be aborted
+      const fetchData = async () => {
+        try {
+          // API dan barcha ma'lumotlarni olish (client-side filtering uchun)
+          const res = await api.listFillials({});
+          if (!mounted || abortController.signal.aborted) return;
+          
+          console.log('Fillials response:', res);
+          console.log('Fillials data items:', res?.items);
+          console.log('Fillials data type:', Array.isArray(res?.items));
+          console.log('Fillials API params:', { page, pageSize, search, regionFilter });
+          
+          // API dan pagination formatida ma'lumot olish (api.ts da convert qilingan)
+          console.log('Fillials response:', res);
+          console.log('Items:', res?.items?.length || 0);
+          console.log('Total:', res?.total || 0);
+          
+          setData(res?.items || []);
+          setTotal(res?.total || 0);
+          setLoading(false);
+        } catch (err: any) {
+          if (!mounted || abortController.signal.aborted) return;
+          
+          console.error("Error fetching fillials:", err);
+          console.error("Error details:", {
+            message: err.message,
+            status: err.status,
+            body: err.body,
+            url: `${process.env.REACT_APP_API_BASE || "http://localhost:3333/api"}/fillial/all`
+          });
+          
+          // Error handling - clear data on error
+          setData([]);
+          setLoading(false);
+          
+          // Only show error if it's not an abort error
+          if (err.name !== 'AbortError') {
+            const errorMessage = err.message || "Ma'lumotlarni yuklashda xatolik yuz berdi";
+            console.warn('Fillials API error:', errorMessage);
+            
+            // Network error yoki authorization error uchun user-friendly message
+            if (err.message.includes('Failed to fetch') || err.message.includes('fetch')) {
+              console.warn('Server bilan aloqa o\'rnatilmadi. Sabablari:');
+              console.warn('1. Internet aloqasi yo\'q');
+              console.warn('2. API server ishlamayapti (https://api.premiumnasiya.uz/api/v1)');
+              console.warn('3. CORS policy muammosi');
+              console.warn('4. Firewall yoki proxy bloklayapti');
+              console.warn('Test Data tugmasini bosib, offline rejimda ishlang.');
+            } else if (err.status === 401) {
+              console.warn('Authentication kerak. Login qiling yoki token yangilang.');
+              console.warn('Test Data tugmasini bosib, offline rejimda ishlang.');
+            }
+          }
+        }
+      };
+      
+      fetchData();
+    }, 150); // 150ms delay to prevent rapid successive calls
+    
     return () => {
       mounted = false;
+      abortController.abort();
+      clearTimeout(timeoutId);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Faqat component mount bo'lganda API chaqirish (client-side filtering)
+
+  // Client-side filtering va pagination
+  const filteredData = React.useMemo(() => {
+    let filtered = data;
+    
+    // Search filter
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name?.toLowerCase().includes(searchLower) ||
+        item.region?.toLowerCase().includes(searchLower) ||
+        item.director_name?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Region filter
+    if (regionFilter !== "all") {
+      filtered = filtered.filter(item => item.region === regionFilter);
+    }
+    
+    return filtered;
+  }, [data, search, regionFilter]);
+  
+  // Pagination
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const pageData = filteredData.slice(startIndex, endIndex);
+  
+  // Total pages filtered data bo'yicha
+  const totalFiltered = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  
+  // Debug: Ma'lumotlar holatini tekshirish
+  console.log('==== FILLIALS PAGINATION DEBUG ====');
+  console.log('Original data (from API):', data);
+  console.log('Total data length:', data?.length);
+  console.log('Search term:', `"${search}"`);
+  console.log('Region filter:', regionFilter);
+  console.log('Filtered data:', filteredData);
+  console.log('Filtered data length:', filteredData?.length);
+  console.log('Current page:', page, 'Page size:', pageSize);
+  console.log('Start index:', startIndex, 'End index:', endIndex);
+  console.log('Page data:', pageData);
+  console.log('Page data length:', pageData?.length);
+  console.log('Total pages calculated:', totalPages);
+  console.log('===================================');
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
-
-  // Paginate filtered data
-  const pageData = React.useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
 
   return (
     <div>
@@ -194,7 +224,10 @@ const Fillials = (): JSX.Element => {
           <div className="relative">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                console.log('Search changing from', `"${search}"`, 'to', `"${e.target.value}"`);
+                setSearch(e.target.value);
+              }}
               className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-80 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               placeholder="Nom yoki hudud bo'yicha qidirish"
             />
@@ -205,7 +238,10 @@ const Fillials = (): JSX.Element => {
           <button onClick={() => { setEditInitial(null); setEditOpen(true); }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200">Filial qo'shish</button>
           <CustomSelect
             value={regionFilter}
-            onChange={setRegionFilter}
+            onChange={(value) => {
+              console.log('Region filter changing from', regionFilter, 'to', value);
+              setRegionFilter(value);
+            }}
             options={[
               { value: "all", label: "Barcha hududlar" },
               ...regions.map(c => ({ value: c, label: c }))
@@ -215,7 +251,11 @@ const Fillials = (): JSX.Element => {
           
           <CustomSelect
             value={String(pageSize)}
-            onChange={(value) => setPageSize(Number(value))}
+            onChange={(value) => {
+              console.log('Page size changing from', pageSize, 'to', value);
+              setPageSize(Number(value));
+              setPage(1); // Page size o'zgarganda birinchi sahifaga qaytish
+            }}
             options={[
               { value: "5", label: "5 ta" },
               { value: "10", label: "10 ta" },
@@ -227,7 +267,7 @@ const Fillials = (): JSX.Element => {
           
           <button
             onClick={async () => {
-              const res = await api.listFillials({});
+              const res = await api.listFillials({ page: 1, pageSize: 10000 });
               const rows = (res.items ?? []).map((f: any) => ({
                 ID: f.id,
                 Name: f.name,
@@ -259,7 +299,22 @@ const Fillials = (): JSX.Element => {
             </tr>
           </thead>
           <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
-            {pageData.map((row) => (
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center">
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <span>Ma'lumotlar yuklanmoqda...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : !pageData || pageData.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  {search || regionFilter !== "all" ? "Qidiruv bo'yicha filiallar topilmadi" : "Filiallar mavjud emas"}
+                </td>
+              </tr>
+            ) : pageData.map((row) => (
               <tr
                 key={row.id}
                 className="border-t border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-700"
@@ -284,7 +339,26 @@ const Fillials = (): JSX.Element => {
                 <td className="px-4 py-2">{row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}</td>
               </tr>
             ))}
-            <DetailModal
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {`${totalFiltered} dan ${pageData?.length || 0} ta ko'rsatilmoqda`}
+        </div>
+        <Pagination 
+          page={page} 
+          totalPages={totalPages} 
+          onPageChange={(p) => {
+            console.log('Pagination clicked, changing to page:', p);
+            setPage(p);
+          }} 
+        />
+      </div>
+
+      {/* Modals */}
+      <DetailModal
               title={selected ? `Filial: ${selected.name}` : "Filial tafsilotlari"}
               isOpen={open}
               onClose={() => {
@@ -340,26 +414,18 @@ const Fillials = (): JSX.Element => {
                 } else {
                   await api.createFillial(payload);
                 }
-                const res = await api.listFillials({});
+                const res = await api.listFillials({
+                  page: page,
+                  pageSize: pageSize,
+                  search: search,
+                  region: regionFilter === "all" ? undefined : regionFilter
+                });
                 setData(res.items || []);
+                setTotal(res.total || 0);
               }}
             />
-            <Toast message={toastMessage} isOpen={toastOpen} onClose={() => setToastOpen(false)} type={toastType} />
-            {pageData.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Natijalar topilmadi
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>
-        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
-      </div>
+      <Toast message={toastMessage} isOpen={toastOpen} onClose={() => setToastOpen(false)} type={toastType} />
     </div>
   );
 };

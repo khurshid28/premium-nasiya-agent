@@ -690,18 +690,88 @@ export async function getMerchant(id: number) {
   return delay(m);
 }
 
+// Auth functions for compatibility
+export async function login(phone: string, password: string) {
+  // Mock login - in development, always succeed
+  return delay({
+    access_token: "mock-token-12345",
+    user: { 
+      id: 1, 
+      phone, 
+      fullname: "Mock Admin User", 
+      role: "ADMIN",
+      image: null as string | null,
+      work_status: "WORKING",
+      merchant_id: null as number | null,
+      fillial_id: null as number | null,
+      createdAt: new Date().toISOString()
+    }
+  });
+}
+
+export async function logout() {
+  // Mock logout
+  return delay(undefined);
+}
+
+export function getCurrentUser() {
+  // Mock current user
+  return { 
+    id: 1, 
+    phone: "+998900000001", 
+    fullname: "Mock Admin User", 
+    role: "ADMIN",
+    image: null as string | null,
+    work_status: "WORKING",
+    merchant_id: null as number | null,
+    fillial_id: null as number | null,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export function isAuthenticated() {
+  // In mock mode, always authenticated
+  return true;
+}
+
 const mock = {
+  // Auth
+  login,
+  logout,
+  getCurrentUser,
+  isAuthenticated,
+  // Users
   listUsers,
   getUser,
   createUser,
   updateUser,
+  deleteUser: async (id: number) => delay(undefined), // mock delete
+  // Fillials
   listFillials,
   getFillial,
   createFillial,
   updateFillial,
+  deleteFillial: async (id: number) => delay(undefined), // mock delete
+  // Applications
+  listApplications,
+  listZayavkalar: listApplications, // alias for compatibility
+  getZayavka: async (id: number) => {
+    const app = MOCK_APPLICATIONS.find(a => a.id === id);
+    if (!app) throw new Error("Not found");
+    return delay(app);
+  },
+  getApplication: async (id: number) => {
+    const app = MOCK_APPLICATIONS.find(a => a.id === id);
+    if (!app) throw new Error("Not found");
+    return delay(app);
+  },
+  createZayavka: async (payload: any) => delay({ id: Date.now(), ...payload }), // mock create
+  updateZayavka: async (id: number, payload: any) => delay({ id, ...payload }), // mock update
+  deleteZayavka: async (id: number) => delay(undefined), // mock delete
+  // Merchants
   listMerchants,
   getMerchant,
-  listApplications,
+  // Aggregations
   aggregateApplicationsByFillial,
   aggregateStatusDistribution,
   aggregateApplicationsOverTime,

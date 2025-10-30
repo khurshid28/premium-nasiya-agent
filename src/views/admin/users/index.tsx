@@ -75,17 +75,22 @@ const Users = (): JSX.Element => {
   React.useEffect(() => {
     // Fetch all users from API
     let mounted = true;
+    const abortController = new AbortController();
     
-    console.log('Fetching users from API...');
-    api
-      .listUsers({})
-      .then((res) => {
-        if (!mounted) return;
+    const timeoutId = setTimeout(async () => {
+      if (!mounted || abortController.signal.aborted) return;
+      
+      try {
+        console.log('Fetching users from API...');
+        const res = await api.listUsers({});
+        if (!mounted || abortController.signal.aborted) return;
+        
         console.log('Users response:', res);
         setUsers(res.items || []);
-      })
-      .catch((err) => {
-        if (!mounted) return;
+      } catch (err: any) {
+        if (!mounted || abortController.signal.aborted) return;
+        if (err.name === 'AbortError') return;
+        
         console.error("Error fetching users:", err);
         console.error("Error details:", {
           message: err.message,
@@ -93,13 +98,13 @@ const Users = (): JSX.Element => {
           body: err.body
         });
         setUsers([]);
-      })
-      .finally(() => {
-        return;
-      });
+      }
+    }, 150);
 
     return () => {
       mounted = false;
+      abortController.abort();
+      clearTimeout(timeoutId);
     };
   }, []);
 

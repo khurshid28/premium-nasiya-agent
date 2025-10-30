@@ -40,7 +40,70 @@ const Navbar = (props: {
   const [results, setResults] = React.useState<SearchItem[]>([]);
   const [showResults, setShowResults] = React.useState(false);
   const [selected, setSelected] = React.useState<SearchItem | null>(null);
+  const [selectedIndex, setSelectedIndex] = React.useState(-1);
   const searchBoxRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Status mapping - inglizcha status larni uzbekchaga
+  const getStatusText = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      'ACTIVE': 'Faol',
+      'PENDING': 'Kutilmoqda', 
+      'APPROVED': 'Tasdiqlangan',
+      'REJECTED': 'Rad qilingan',
+      'COMPLETED': 'Tugatilgan',
+      'CANCELLED': 'Bekor qilingan',
+      'CANCELED_BY_SCORING': 'Rad qilingan',
+      'CANCELED_BY_CLIENT': 'Rad qilingan',
+      'CANCELED_BY_DAILY': 'Rad qilingan',
+      'LIMIT': 'Limit',
+      'DRAFT': 'Qoralama'
+    };
+    return statusMap[status?.toUpperCase()] || status;
+  };
+
+  // Status color mapping
+  const getStatusColor = (status: string) => {
+    const statusLower = status?.toLowerCase();
+    if (statusLower === 'active' || statusLower === 'approved' || statusLower === 'completed') {
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+    } else if (statusLower === 'pending' || statusLower === 'draft') {
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+    } else if (statusLower === 'rejected' || statusLower === 'cancelled' || statusLower.includes('canceled') || statusLower.includes('scoring')) {
+      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+    } else if (statusLower === 'limit') {
+      return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+    }
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+  };
+
+  // Highlight search term in text
+  const highlightText = (text: string, searchTerm: string) => {
+    if (!searchTerm.trim()) return text;
+    
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    
+    return parts.map((part, index) => 
+      regex.test(part) ? 
+        <span key={index} className="bg-yellow-200 dark:bg-yellow-600 text-gray-900 dark:text-white font-medium">{part}</span> : 
+        part
+    );
+  };
+
+  // Outside click listener
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+        setSelectedIndex(-1);
+      }
+    };
+
+    if (showResults) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showResults]);
 
   React.useEffect(() => {
     if (query.trim().length < 2) {
@@ -52,39 +115,94 @@ const Navbar = (props: {
     setShowResults(true);
     const t = setTimeout(async () => {
       try {
+        // Global search - barcha ma'lumotlarni olib, client-side da search qilish
         const [usersRes, appsRes, filsRes] = await Promise.all([
-          api.listUsers({ page: 1, pageSize: 5, search: query }),
-          api.listApplications({ page: 1, pageSize: 5, search: query }),
-          api.listFillials({ page: 1, pageSize: 5, search: query }),
+          api.listUsers({}),
+          api.listApplications({}),
+          api.listFillials({}),
         ]);
+        const searchLower = query.toLowerCase();
         const list: SearchItem[] = [];
-        usersRes.items.forEach((u: any) =>
-          list.push({
-            type: "operator",
-            id: u.id,
-            title: u.fullname ?? "",
-            subtitle: u.phone ?? "",
-            raw: u,
+        
+        // Users/Operators search - name, phone, fullname
+        usersRes.items
+          .filter((u: any) => {
+            const searchFields = [
+              u.fullname?.toLowerCase() || '',
+              u.phone?.toLowerCase() || '',
+              u.name?.toLowerCase() || '',
+              u.id?.toString() || ''
+            ];
+            return searchFields.some(field => field.includes(searchLower));
           })
-        );
-        appsRes.items.forEach((a: any) =>
-          list.push({
-            type: "application",
-            id: a.id,
-            title: `${a.fullname ?? "-"} • #${a.id}`,
-            subtitle: `${a.phone ?? ""} ${a.status ? " • " + a.status : ""}`.trim(),
-            raw: a,
+          .slice(0, 5) // Faqat 5 ta natija
+          .forEach((u: any) =>
+            list.push({
+              type: "operator",
+              id: u.id,
+              title: u.fullname ?? u.name ?? "",
+              subtitle: u.phone ?? "",
+              raw: u,
+            })
+          );
+        
+        // Applications search - fullname, phone, ID, status
+        appsRes.items
+          .filter((a: any) => {
+            const searchFields = [
+              a.fullname?.toLowerCase() || '',
+              a.phone?.toLowerCase() || '',
+              a.id?.toString() || '',
+              a.status?.toLowerCase() || '',
+              a.passport?.toLowerCase() || '',
+              // Uzbekcha status nomlari bilan ham search qilish
+              getStatusText(a.status || '')?.toLowerCase() || ''
+            ];
+            return searchFields.some(field => field.includes(searchLower));
           })
-        );
-        filsRes.items.forEach((f: any) =>
-          list.push({
-            type: "fillial",
-            id: f.id,
-            title: f.name ?? "",
-            subtitle: f.region ? `Hudud: ${f.region}` : undefined,
-            raw: f,
+          .slice(0, 5) // Faqat 5 ta natija
+          .forEach((a: any) =>
+            list.push({
+              type: "application",
+              id: a.id,
+              title: `${a.fullname ?? "-"} • #${a.id}`,
+              subtitle: `${a.phone ?? ""} ${a.status ? " • " + getStatusText(a.status) : ""}`.trim(),
+              raw: a,
+            })
+          );
+        
+        // Fillials search - name, region, director_name, director_phone
+        filsRes.items
+          .filter((f: any) => {
+            const searchFields = [
+              f.name?.toLowerCase() || '',
+              f.director_name?.toLowerCase() || '',
+              f.director_phone?.toLowerCase() || '',
+              f.address?.toLowerCase() || '',
+              f.id?.toString() || ''
+            ];
+            
+            // Region uchun alohida, aniqroq search
+            const regionMatch = f.region?.toLowerCase().includes(searchLower) || false;
+            
+            // Agar search term region bilan match bo'lsa, aniq match talab qilamiz
+            if (searchLower === 'alp' || searchLower === 'qora' || searchLower === 'qalp') {
+              return f.region?.toLowerCase().includes('qoraqalp') || 
+                     searchFields.some(field => field.includes(searchLower));
+            }
+            
+            return regionMatch || searchFields.some(field => field.includes(searchLower));
           })
-        );
+          .slice(0, 5) // Faqat 5 ta natija
+          .forEach((f: any) =>
+            list.push({
+              type: "fillial",
+              id: f.id,
+              title: f.name ?? "",
+              subtitle: f.region ? `Hudud: ${f.region}` : (f.director_name ? `Direktor: ${f.director_name}` : undefined),
+              raw: f,
+            })
+          );
         setResults(list);
       } catch (e) {
         setResults([]);
@@ -125,24 +243,69 @@ const Navbar = (props: {
             type="text"
             placeholder="Qidirish..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(-1); // Reset selection on typing
+            }}
             onFocus={() => query.trim().length >= 2 && setShowResults(true)}
+            onKeyDown={(e) => {
+              if (!showResults || results.length === 0) return;
+              
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(prev => prev < results.length - 1 ? prev + 1 : 0);
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => prev > 0 ? prev - 1 : results.length - 1);
+              } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                const selectedResult = results[selectedIndex];
+                setShowResults(false);
+                setQuery("");
+                setSelectedIndex(-1);
+                
+                // Navigate to appropriate page
+                if (selectedResult.type === "operator") {
+                  navigate("/admin/users");
+                } else if (selectedResult.type === "application") {
+                  navigate("/admin/applications");
+                } else if (selectedResult.type === "fillial") {
+                  navigate("/admin/fillials");
+                }
+                // Then show modal
+                setTimeout(() => setSelected(selectedResult), 100);
+              } else if (e.key === 'Escape') {
+                setShowResults(false);
+                setSelectedIndex(-1);
+              }
+            }}
             className="block h-full w-full rounded-full bg-lightPrimary text-sm font-medium text-navy-700 outline-none placeholder:!text-gray-400 dark:bg-navy-900 dark:text-white dark:placeholder:!text-white sm:w-fit"
           />
           {showResults && (
-            <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-white/10 dark:bg-navy-700">
+            <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[400px] max-w-[600px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-shadow-500 dark:border-white/10 dark:bg-navy-700 dark:shadow-none">
               {loading ? (
-                <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-300">Qidirilmoqda...</div>
+                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-300 flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-gray-300 rounded-full border-t-blue-600"></div>
+                  Qidirilmoqda...
+                </div>
               ) : results.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-300">Natija topilmadi</div>
+                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-300">Natija topilmadi</div>
               ) : (
-                <ul className="max-h-72 overflow-auto py-1">
-                  {results.map((r) => (
+                <div>
+                  <div className="px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-300 bg-gray-50 dark:bg-navy-800 border-b border-gray-100 dark:border-gray-600 flex items-center justify-between">
+                    <span>{results.length} ta natija topildi</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      ESC - yopish, ↑↓ - tanlash, Enter - ochish
+                    </span>
+                  </div>
+                  <ul className="max-h-96 overflow-auto py-1">
+                  {results.map((r, index) => (
                     <li
                       key={`${r.type}-${r.id}`}
                       onClick={() => {
                         setShowResults(false);
                         setQuery("");
+                        setSelectedIndex(-1);
                         // Navigate to appropriate page
                         if (r.type === "operator") {
                           navigate("/admin/users");
@@ -154,22 +317,54 @@ const Navbar = (props: {
                         // Then show modal
                         setTimeout(() => setSelected(r), 100);
                       }}
-                      className="cursor-pointer px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/10"
+                      className={`cursor-pointer px-3 py-2 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+                        index === selectedIndex 
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' 
+                          : 'hover:bg-gray-50 dark:hover:bg-white/10'
+                      }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium text-navy-700 dark:text-white">{r.title}</div>
-                          {r.subtitle ? (
-                            <div className="text-xs text-gray-600 dark:text-gray-300">{r.subtitle}</div>
-                          ) : null}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-navy-700 dark:text-white truncate">
+                            {highlightText(r.title, query)}
+                          </div>
+                          {r.subtitle && (
+                            <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate">
+                              {highlightText(r.subtitle, query)}
+                            </div>
+                          )}
+                          {/* Ko'shimcha ma'lumotlar */}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {r.type === "operator" && r.raw?.phone && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                📞 {r.raw.phone}
+                              </span>
+                            )}
+                            {r.type === "application" && r.raw?.status && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${getStatusColor(r.raw.status)}`}>
+                                {getStatusText(r.raw.status)}
+                              </span>
+                            )}
+                            {r.type === "fillial" && r.raw?.region && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                                📍 {r.raw.region}
+                              </span>
+                            )}
+                            {r.raw?.id && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                ID: {r.raw.id}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className="ml-3 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                        <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-white/10 dark:text-gray-300">
                           {r.type === "operator" ? "Operator" : r.type === "application" ? "Ariza" : "Filial"}
                         </span>
                       </div>
                     </li>
                   ))}
                 </ul>
+                </div>
               )}
             </div>
           )}
@@ -481,7 +676,7 @@ const Navbar = (props: {
                   {selected.raw.nds && (
                     <div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">NDS</p>
-                      <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.nds}%</p>
+                      <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.nds}</p>
                     </div>
                   )}
                 </div>

@@ -66,8 +66,9 @@ const Applications = (): JSX.Element => {
     return [
       { value: "all", label: "Barcha holatlar" },
       { value: "CONFIRMED", label: "Tugatilgan" },
+      { value: "PENDING", label: "Kutilmoqda" },
       { value: "REJECTED", label: "Rad qilingan" },
-      { value: "PENDING", label: "Kutilmoqda" }
+      { value: "LIMIT", label: "Limit" }
     ];
   }, []);
 
@@ -80,46 +81,53 @@ const Applications = (): JSX.Element => {
 
   React.useEffect(() => {
     let mounted = true;
-    console.log('Fetching applications from API...');
-    api.listApplications({}).then((res) => {
-      if (!mounted) return;
-      console.log('Applications response:', res);
-      const apps = res?.items || [];
-      console.log('Applications count:', apps.length);
-      if (apps.length > 0) {
-        const statuses = apps.map((a: any) => a.status);
-        console.log('Application statuses:', statuses);
-        const uniqueStatuses = [...new Set(statuses)];
-        console.log('Unique statuses:', uniqueStatuses);
+    const abortController = new AbortController();
+    
+    // Add delay to prevent rapid navigation issues
+    const timeoutId = setTimeout(async () => {
+      if (!mounted || abortController.signal.aborted) return;
+      
+      try {
+        console.log('Fetching applications from API...');
+        const [appsRes, fillialsRes] = await Promise.all([
+          api.listApplications({}),
+          api.listFillials({})
+        ]);
+        
+        if (!mounted || abortController.signal.aborted) return;
+        
+        console.log('Applications response:', appsRes);
+        const apps = appsRes?.items || [];
+        console.log('Applications count:', apps.length);
+        if (apps.length > 0) {
+          const statuses = apps.map((a: any) => a.status);
+          console.log('Application statuses:', statuses);
+          const uniqueStatuses = [...new Set(statuses)];
+          console.log('Unique statuses:', uniqueStatuses);
+        }
+        setApplications(apps);
+        
+        console.log('Fillials for applications:', fillialsRes);
+        setFillialsList(fillialsRes?.items || []);
+      } catch (err: any) {
+        if (!mounted || abortController.signal.aborted) return;
+        if (err.name === 'AbortError') return;
+        
+        console.error("Error fetching data:", err);
+        console.error("Error details:", {
+          message: err.message,
+          status: err.status,
+          body: err.body
+        });
+        setApplications([]);
+        setFillialsList([]);
       }
-      setApplications(apps);
-    }).catch((err) => {
-      if (!mounted) return;
-      console.error("Error fetching applications:", err);
-      console.error("Error details:", {
-        message: err.message,
-        status: err.status,
-        body: err.body
-      });
-      setApplications([]);
-    });
-    console.log('Fetching fillials from API...');
-    api.listFillials({}).then((res) => {
-      if (!mounted) return;
-      console.log('Fillials for applications:', res);
-      setFillialsList(res?.items || []);
-    }).catch((err) => {
-      if (!mounted) return;
-      console.error("Error fetching fillials:", err);
-      console.error("Error details:", {
-        message: err.message,
-        status: err.status,
-        body: err.body
-      });
-      setFillialsList([]);
-    });
+    }, 150);
+    
     return () => {
       mounted = false;
+      abortController.abort();
+      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -141,14 +149,19 @@ const Applications = (): JSX.Element => {
       if (statusFilter !== "all") {
         const st = (a.status ?? "").toUpperCase();
         if (statusFilter === "CONFIRMED") {
-          // Tugatilgan: CONFIRMED or FINISHED
-          matchesStatus = st === "CONFIRMED" || st === "FINISHED";
+          // Tugatilgan: CONFIRMED, FINISHED, COMPLETED, ACTIVE
+          matchesStatus = st === "CONFIRMED" || st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
         } else if (statusFilter === "REJECTED") {
-          // Rad qilingan: all CANCELED_ statuses
-          matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI";
+          // Rad qilingan: all CANCELED_ statuses, REJECTED, SCORING
+          matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || st === "REJECTED" || st.includes("RAD") || st.includes("SCORING");
+        } else if (statusFilter === "LIMIT") {
+          // Limit: LIMIT statuses
+          matchesStatus = st === "LIMIT" || st.includes("LIMIT");
         } else if (statusFilter === "PENDING") {
-          // Kutilmoqda: CREATED, ADDED_DETAIL, WAITING_, etc
-          matchesStatus = st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || st === "ADDED_PRODUCT" || st === "LIMIT" || st === "PENDING";
+          // Kutilmoqda: CREATED, ADDED_DETAIL, WAITING_, etc (excluding LIMIT and others)
+          matchesStatus = st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || st === "ADDED_PRODUCT" || st === "PENDING" || 
+                         (!st.includes("CANCELED") && st !== "CONFIRMED" && st !== "FINISHED" && st !== "COMPLETED" && st !== "ACTIVE" && 
+                          st !== "REJECTED" && st !== "LIMIT" && !st.includes("RAD"));
         } else {
           matchesStatus = a.status === statusFilter;
         }
@@ -384,18 +397,18 @@ const Applications = (): JSX.Element => {
                 </>
               ) : (
                 <>
-                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3 text-center">ID</th>
                   <th className="px-4 py-3">Ariza beruvchi</th>
-                  <th className="px-4 py-3">Telefon</th>
-                  <th className="px-4 py-3">Mahsulotlar</th>
-                  <th className="px-4 py-3">Tovarlar</th>
-                  <th className="px-4 py-3">To'lov summasi</th>
-                  <th className="px-4 py-3">To'lov</th>
-                  <th className="px-4 py-3">Filial</th>
-                  <th className="px-4 py-3">Hujjat</th>
-                  <th className="px-4 py-3">Holat</th>
-                  <th className="px-4 py-3">Muddati</th>
-                  <th className="px-4 py-3">Yaratildi</th>
+                  <th className="px-4 py-3 text-center">Telefon</th>
+                  <th className="px-4 py-3 text-center">Mahsulotlar</th>
+                  <th className="px-4 py-3 text-center">Tovarlar</th>
+                  <th className="px-4 py-3 text-center">To'lov summasi</th>
+                  <th className="px-4 py-3 text-center">To'lov</th>
+                  <th className="px-4 py-3 text-center">Filial</th>
+                  <th className="px-4 py-3 text-center">Hujjat</th>
+                  <th className="px-4 py-3 text-center">Holat</th>
+                  <th className="px-4 py-3 text-center">Muddati</th>
+                  <th className="px-4 py-3 text-center">Yaratildi</th>
                 </>
               )}
             </tr>
@@ -458,7 +471,7 @@ const Applications = (): JSX.Element => {
                   </>
                 ) : (
                   <>
-                    <td className="px-4 py-2">{a.id}</td>
+                    <td className="px-4 py-2 text-center">{a.id}</td>
                     <td className="px-4 py-2">
                       <AvatarName
                         image={(a.user as any)?.image ?? null}
@@ -467,13 +480,13 @@ const Applications = (): JSX.Element => {
                         size="md"
                       />
                     </td>
-                    <td className="px-4 py-2">{formatPhone(a.phone)}</td>
-                    <td className="px-4 py-2">{a.products ? a.products.length : 0}</td>
-                    <td className="px-4 py-2">{formatMoney(a.amount)}</td>
-                    <td className="px-4 py-2 font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</td>
-                    <td className="px-4 py-2">{a.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</td>
-                    <td className="px-4 py-2">{a.fillial?.name ?? "-"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 text-center">{formatPhone(a.phone)}</td>
+                    <td className="px-4 py-2 text-center">{a.products ? a.products.length : 0}</td>
+                    <td className="px-4 py-2 text-center">{formatMoney(a.amount)}</td>
+                    <td className="px-4 py-2 text-center font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</td>
+                    <td className="px-4 py-2 text-center">{a.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</td>
+                    <td className="px-4 py-2 text-center">{a.fillial?.name ?? "-"}</td>
+                    <td className="px-4 py-2 text-center">
                       {a.status === "APPROVED" ? (
                         <button
                           onClick={async (e) => {
@@ -508,8 +521,8 @@ const Applications = (): JSX.Element => {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-2">{(() => { const b = appStatusBadge(a.status); return <span className={b.className}>{b.label}</span>; })()}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 text-center">{(() => { const b = appStatusBadge(a.status); return <span className={b.className}>{b.label}</span>; })()}</td>
+                    <td className="px-4 py-2 text-center">
                       {a.expired_month ? (
                         <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
                           {a.expired_month} oy
@@ -518,7 +531,7 @@ const Applications = (): JSX.Element => {
                         <span className="text-gray-400 dark:text-gray-500">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-2">{formatDate24Hour(a.createdAt)}</td>
+                    <td className="px-4 py-2 text-center">{formatDate24Hour(a.createdAt)}</td>
                   </>
                 )}
               </tr>
