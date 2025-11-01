@@ -5,12 +5,19 @@ import DashIcon from "components/icons/DashIcon";
 import ErrorBoundary from "components/ErrorBoundary";
 
 // Sidebar links renderer
-export const SidebarLinks = (props: { routes: RoutesType[] }): JSX.Element => {
-  const { routes } = props;
+export const SidebarLinks = (props: { routes: RoutesType[]; onClose?: React.MouseEventHandler<HTMLSpanElement> }): JSX.Element => {
+  const { routes, onClose } = props;
   const location = useLocation();
 
   const activeRoute = (routeName: string) => {
     return location.pathname.includes(routeName);
+  };
+
+  const handleLinkClick = () => {
+    // Close sidebar on mobile when a link is clicked
+    if (window.innerWidth < 1280 && onClose) {
+      onClose({} as React.MouseEvent<HTMLSpanElement>);
+    }
   };
 
   const createLinks = (routes: RoutesType[]) => {
@@ -20,7 +27,7 @@ export const SidebarLinks = (props: { routes: RoutesType[] }): JSX.Element => {
       if ((route as any).hidden) return null;
       if (route.layout === "/admin") {
         return (
-          <Link key={index} to={route.layout + "/" + route.path}>
+          <Link key={index} to={route.layout + "/" + route.path} onClick={handleLinkClick}>
             <div className="relative mb-3 flex hover:cursor-pointer">
               <li className="my-[3px] flex cursor-pointer items-center px-6" key={index}>
                 {/* modest icon tile */}

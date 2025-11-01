@@ -41,7 +41,6 @@ type Fillial = {
 const Fillials = (): JSX.Element => {
   const [data, setData] = React.useState<Fillial[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [total, setTotal] = React.useState(0);
   
   const [search, setSearch] = React.useState("");
   const [regionFilter, setRegionFilter] = React.useState("all");
@@ -91,7 +90,6 @@ const Fillials = (): JSX.Element => {
       if (!mounted || abortController.signal.aborted) return;
       
       setLoading(true);
-      console.log('Fetching fillials from API...');
       
       // Create a promise that can be aborted
       const fetchData = async () => {
@@ -100,52 +98,14 @@ const Fillials = (): JSX.Element => {
           const res = await api.listFillials({});
           if (!mounted || abortController.signal.aborted) return;
           
-          console.log('Fillials response:', res);
-          console.log('Fillials data items:', res?.items);
-          console.log('Fillials data type:', Array.isArray(res?.items));
-          console.log('Fillials API params:', { page, pageSize, search, regionFilter });
-          
-          // API dan pagination formatida ma'lumot olish (api.ts da convert qilingan)
-          console.log('Fillials response:', res);
-          console.log('Items:', res?.items?.length || 0);
-          console.log('Total:', res?.total || 0);
-          
           setData(res?.items || []);
-          setTotal(res?.total || 0);
           setLoading(false);
         } catch (err: any) {
           if (!mounted || abortController.signal.aborted) return;
           
-          console.error("Error fetching fillials:", err);
-          console.error("Error details:", {
-            message: err.message,
-            status: err.status,
-            body: err.body,
-            url: `${process.env.REACT_APP_API_BASE || "http://localhost:3333/api"}/fillial/all`
-          });
-          
           // Error handling - clear data on error
           setData([]);
           setLoading(false);
-          
-          // Only show error if it's not an abort error
-          if (err.name !== 'AbortError') {
-            const errorMessage = err.message || "Ma'lumotlarni yuklashda xatolik yuz berdi";
-            console.warn('Fillials API error:', errorMessage);
-            
-            // Network error yoki authorization error uchun user-friendly message
-            if (err.message.includes('Failed to fetch') || err.message.includes('fetch')) {
-              console.warn('Server bilan aloqa o\'rnatilmadi. Sabablari:');
-              console.warn('1. Internet aloqasi yo\'q');
-              console.warn('2. API server ishlamayapti (https://api.premiumnasiya.uz/api/v1)');
-              console.warn('3. CORS policy muammosi');
-              console.warn('4. Firewall yoki proxy bloklayapti');
-              console.warn('Test Data tugmasini bosib, offline rejimda ishlang.');
-            } else if (err.status === 401) {
-              console.warn('Authentication kerak. Login qiling yoki token yangilang.');
-              console.warn('Test Data tugmasini bosib, offline rejimda ishlang.');
-            }
-          }
         }
       };
       
@@ -190,16 +150,6 @@ const Fillials = (): JSX.Element => {
   // Total pages filtered data bo'yicha
   const totalFiltered = filteredData.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
-  
-  // Debug: Ma'lumotlar holatini tekshirish
-  console.log('==== FILLIALS PAGINATION DEBUG ====');
-  console.log('Original data (from API):', data);
-  console.log('Total data length:', data?.length);
-  console.log('Search term:', `"${search}"`);
-  console.log('Region filter:', regionFilter);
-  console.log('Filtered data:', filteredData);
-  console.log('Filtered data length:', filteredData?.length);
-  console.log('Current page:', page, 'Page size:', pageSize);
   console.log('Start index:', startIndex, 'End index:', endIndex);
   console.log('Page data:', pageData);
   console.log('Page data length:', pageData?.length);
@@ -217,26 +167,39 @@ const Fillials = (): JSX.Element => {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Filiallar</h2>
+      <div className="mb-4">
+        <h2 className="text-xl sm:text-2xl font-semibold">Filiallar</h2>
+      </div>
+      
+      {/* Mobile: Stack everything vertically */}
+      <div className="flex flex-col gap-3 mb-4">
+        {/* Search input - full width on mobile, limited on desktop */}
+        <div className="relative w-full sm:w-80 lg:w-96">
+          <input
+            value={search}
+            onChange={(e) => {
+              console.log('Search changing from', `"${search}"`, 'to', `"${e.target.value}"`);
+              setSearch(e.target.value);
+            }}
+            className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-full text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            placeholder="Nom yoki hudud bo'yicha qidirish"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </div>
-        <div className="flex gap-3">
-          <div className="relative">
-            <input
-              value={search}
-              onChange={(e) => {
-                console.log('Search changing from', `"${search}"`, 'to', `"${e.target.value}"`);
-                setSearch(e.target.value);
-              }}
-              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-80 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              placeholder="Nom yoki hudud bo'yicha qidirish"
-            />
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <button onClick={() => { setEditInitial(null); setEditOpen(true); }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200">Filial qo'shish</button>
+        
+        {/* Buttons and filters row */}
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => { 
+            setToastType("error");
+            setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+            setToastOpen(true);
+          }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 text-sm whitespace-nowrap">
+            <span className="hidden sm:inline">Filial qo'shish</span>
+            <span className="sm:hidden">+ Filial</span>
+          </button>
+          
           <CustomSelect
             value={regionFilter}
             onChange={(value) => {
@@ -247,7 +210,7 @@ const Fillials = (): JSX.Element => {
               { value: "all", label: "Barcha hududlar" },
               ...regions.map(c => ({ value: c, label: c }))
             ]}
-            className="min-w-[140px]"
+            className="min-w-[120px] sm:min-w-[140px] flex-1 sm:flex-none"
           />
           
           <CustomSelect
@@ -263,40 +226,56 @@ const Fillials = (): JSX.Element => {
               { value: "25", label: "25 ta" },
               { value: "50", label: "50 ta" }
             ]}
-            className="min-w-[120px]"
+            className="min-w-[100px] sm:min-w-[120px]"
           />
           
           <button
             onClick={async () => {
-              const res = await api.listFillials({ page: 1, pageSize: 10000 });
-              const rows = (res.items ?? []).map((f: any) => ({
+              const rows = filteredData.map((f: any) => ({
                 ID: f.id,
-                Name: f.name,
-                Address: f.address ?? "",
+                Nomi: f.name,
+                Manzil: f.address ?? "",
                 Merchant: f.merchant?.name ?? "",
-                Region: f.region ?? "",
-                Status: f.work_status ?? "",
-                Created: f.createdAt ?? "",
+                Hudud: f.region ?? "",
+                Holat: f.work_status ?? "",
+                Yaratildi: f.createdAt ?? "",
               }));
               exportSingleTable({ rows, title: "Filiallar", dateLabel: "Barcha sanalar" });
             }}
-            className="h-10 rounded bg-indigo-600 hover:bg-indigo-700 px-3 text-white"
+            className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3 sm:px-4 text-white inline-flex items-center gap-2 text-sm whitespace-nowrap"
           >
-            Filiallarni export qilish
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="7 10 12 15 17 10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="12" y1="15" x2="12" y2="3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hidden sm:inline">Yuklab olish</span>
+            <span className="sm:hidden">Excel</span>
+          </button>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className="h-11 rounded-xl bg-green-600 hover:bg-green-700 px-3 sm:px-4 text-white inline-flex items-center gap-2 text-sm whitespace-nowrap transition-all duration-200 active:scale-95"
+            title="Sahifani yangilash"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hidden sm:inline">Yangilash</span>
           </button>
         </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
+      <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
         <table className="w-full table-auto min-w-[600px]">
-          <thead className="bg-gray-50 dark:bg-navy-800 text-left text-sm text-gray-600 dark:text-gray-300">
+          <thead className="bg-gray-50 dark:bg-navy-800 text-left text-xs sm:text-sm text-gray-600 dark:text-gray-300">
             <tr>
-              <th className="px-6 py-4">ID</th>
-              <th className="px-6 py-4">Nomi</th>
-              <th className="px-6 py-4">Hudud</th>
-              <th className="px-6 py-4">Direktor</th>
-              <th className="px-6 py-4">Holat</th>
-              <th className="px-6 py-4">Yaratildi</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4">ID</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4">Nomi</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">Hudud</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">Direktor</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4">Holat</th>
+              <th className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">Yaratildi</th>
             </tr>
           </thead>
           <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
@@ -342,11 +321,11 @@ const Fillials = (): JSX.Element => {
                   }
                 }}
               >
-                <td className="px-6 py-3">{row.id}</td>
-                <td className="px-6 py-3">{row.name}</td>
-                <td className="px-6 py-3">{row.region ?? "-"}</td>
-                <td className="px-6 py-3">{row.director_name ?? "-"}</td>
-                <td className="px-4 py-2">
+                <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm">{row.id}</td>
+                <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm font-medium">{row.name}</td>
+                <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell">{row.region ?? "-"}</td>
+                <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm hidden md:table-cell">{row.director_name ?? "-"}</td>
+                <td className="px-3 sm:px-4 py-2">
                   {row.work_status === "WORKING" ? (
                     <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-800 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-100">Ishlaydi</span>
                   ) : row.work_status === "BLOCKED" ? (
@@ -355,15 +334,15 @@ const Fillials = (): JSX.Element => {
                     <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-100">{row.work_status ?? "-"}</span>
                   )}
                 </td>
-                <td className="px-4 py-2">{row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}</td>
+                <td className="px-3 sm:px-4 py-2 text-xs sm:text-sm hidden lg:table-cell">{row.createdAt ? new Date(row.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' }) : "-"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
           {`${totalFiltered} dan ${pageData?.length || 0} ta ko'rsatilmoqda`}
         </div>
         <Pagination 
@@ -499,7 +478,11 @@ const Fillials = (): JSX.Element => {
                       >
                         Barcha ma'lumotlarni ko'chirish
                       </button>
-                      <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { setEditInitial(selected); setEditOpen(true); }}>Tahrirlash</button>
+                      <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { 
+                        setToastType("error");
+                        setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+                        setToastOpen(true);
+                      }}>Tahrirlash</button>
                     </div>
                   </div>
               ) : (
@@ -526,7 +509,6 @@ const Fillials = (): JSX.Element => {
                   region: regionFilter === "all" ? undefined : regionFilter
                 });
                 setData(res.items || []);
-                setTotal(res.total || 0);
               }}
             />
 

@@ -69,7 +69,7 @@ export default function SignIn(): JSX.Element {
       });
       
       // Navigate to admin default
-      navigate("/admin/default");
+      navigate("/admin/dashboard");
     } catch (err: any) {
       console.error("Login error:", err);
       

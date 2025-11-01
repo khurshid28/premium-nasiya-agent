@@ -16,7 +16,7 @@ const routes = [
   {
     name: "Boshqaruv paneli",
     layout: "/admin",
-    path: "default",
+    path: "dashboard",
   icon: <LayoutDashboard size={20} />,
     component: <MainDashboard />,
   },

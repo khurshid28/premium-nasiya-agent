@@ -226,50 +226,68 @@ const Dashboard = (): JSX.Element => {
           </div>
         </div>
         
-        {/* Filters row */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative">
+        {/* Filters - Multiple rows */}
+        <div className="space-y-3">
+          {/* Row 1: Search only */}
+          <div className="relative w-full sm:w-80 lg:w-96">
             <input 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
               placeholder="Filial yoki manzil bo'yicha qidirish" 
-              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-72 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-full text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
             />
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
+          
+          {/* Row 2: Date Picker only */}
           <DateRangePicker startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} />
-          <CustomSelect
-            value={selectedRegion}
-            onChange={(value) => { setSelectedRegion(value); setSelectedFillialId("all"); }}
-            options={regions.map(r => ({ 
-              value: r, 
-              label: r === "all" ? "Barcha hududlar" : r 
-            }))}
-            className="min-w-[160px]"
-          />
-          <CustomSelect
-            value={String(selectedFillialId)}
-            onChange={(value) => { setSelectedFillialId(value === "all" ? "all" : Number(value)); }}
-            options={[
-              { value: "all", label: "Barcha filiallar" },
-              ...(Array.isArray(fillials) ? fillials : []).filter((f) => selectedRegion === "all" || f.region === selectedRegion).map((f) => ({ 
-                value: String(f.id), 
-                label: f.name 
-              }))
-            ]}
-            className="min-w-[160px]"
-          />
-          <CustomSelect
-            value={String(selectedExpiredMonth)}
-            onChange={(value) => { setSelectedExpiredMonth(value === "all" ? "all" : Number(value)); }}
-            options={expiredMonths.map(m => ({ 
-              value: String(m), 
-              label: m === "all" ? "Barcha muddatlar" : `${m} oy` 
-            }))}
-            className="min-w-[160px]"
-          />
+          
+          {/* Row 3: All Filters and Refresh button */}
+          <div className="flex flex-wrap items-center gap-2">
+            <CustomSelect
+              value={selectedRegion}
+              onChange={(value) => { setSelectedRegion(value); setSelectedFillialId("all"); }}
+              options={regions.map(r => ({ 
+                value: r, 
+                label: r === "all" ? "Barcha hududlar" : r 
+              }))}
+              className="w-full sm:w-auto sm:min-w-[160px]"
+            />
+            <CustomSelect
+              value={String(selectedFillialId)}
+              onChange={(value) => { setSelectedFillialId(value === "all" ? "all" : Number(value)); }}
+              options={[
+                { value: "all", label: "Barcha filiallar" },
+                ...(Array.isArray(fillials) ? fillials : []).filter((f) => selectedRegion === "all" || f.region === selectedRegion).map((f) => ({ 
+                  value: String(f.id), 
+                  label: f.name 
+                }))
+              ]}
+              className="w-full sm:w-auto sm:min-w-[160px]"
+            />
+            <CustomSelect
+              value={String(selectedExpiredMonth)}
+              onChange={(value) => { setSelectedExpiredMonth(value === "all" ? "all" : Number(value)); }}
+              options={expiredMonths.map(m => ({ 
+                value: String(m), 
+                label: m === "all" ? "Barcha muddatlar" : `${m} oy` 
+              }))}
+              className="w-full sm:w-auto sm:min-w-[160px]"
+            />
+            
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full sm:w-auto h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-3 sm:px-4 text-white inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap transition-all duration-200 active:scale-95"
+              title="Sahifani yangilash"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Yangilash</span>
+            </button>
+          </div>
         </div>
       </div>
 

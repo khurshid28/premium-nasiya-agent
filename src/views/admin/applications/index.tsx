@@ -99,7 +99,6 @@ const Applications = (): JSX.Element => {
       if (!mounted || abortController.signal.aborted) return;
       
       try {
-        console.log('Fetching applications from API...');
         const [appsRes, fillialsRes] = await Promise.all([
           api.listApplications({}),
           api.listFillials({})
@@ -107,29 +106,13 @@ const Applications = (): JSX.Element => {
         
         if (!mounted || abortController.signal.aborted) return;
         
-        console.log('Applications response:', appsRes);
         const apps = appsRes?.items || [];
-        console.log('Applications count:', apps.length);
-        if (apps.length > 0) {
-          const statuses = apps.map((a: any) => a.status);
-          console.log('Application statuses:', statuses);
-          const uniqueStatuses = [...new Set(statuses)];
-          console.log('Unique statuses:', uniqueStatuses);
-        }
         setApplications(apps);
-        
-        console.log('Fillials for applications:', fillialsRes);
         setFillialsList(fillialsRes?.items || []);
       } catch (err: any) {
         if (!mounted || abortController.signal.aborted) return;
         if (err.name === 'AbortError') return;
         
-        console.error("Error fetching data:", err);
-        console.error("Error details:", {
-          message: err.message,
-          status: err.status,
-          body: err.body
-        });
         setApplications([]);
         setFillialsList([]);
       }
@@ -163,17 +146,14 @@ const Applications = (): JSX.Element => {
         if (statusFilter === "CONFIRMED") {
           // Tasdiqlangan: faqat CONFIRMED status
           matchesStatus = st === "CONFIRMED";
-          console.log(`DEBUG: Ariza ${a.id} (${st}) CONFIRMED filterida: ${matchesStatus}`);
         } else if (statusFilter === "FINISHED") {
           // Tugatilgan: FINISHED, COMPLETED, ACTIVE statuslari
           matchesStatus = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
-          console.log(`DEBUG: Ariza ${a.id} (${st}) FINISHED filterida: ${matchesStatus}`);
         } else if (statusFilter === "REJECTED") {
           // Rad qilingan: all rejection statuses - more precise matching
           matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || 
                          st === "REJECTED" || st.includes("RAD") || st.includes("SCORING") ||
                          st === "DECLINED" || st === "REFUSED";
-          console.log(`DEBUG: Ariza ${a.id} (${st}) REJECTED filterida: ${matchesStatus}`);
         } else if (statusFilter === "LIMIT") {
           // Limit: LIMIT statuses
           matchesStatus = st === "LIMIT" || st.includes("LIMIT");
@@ -189,7 +169,6 @@ const Applications = (): JSX.Element => {
           matchesStatus = !isConfirmed && !isFinished && !isRejected && 
                          (st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || 
                           st === "ADDED_PRODUCT" || st === "PENDING" || st === "NEW" || st === "PROCESSING");
-          console.log(`DEBUG: Ariza ${a.id} (${st}) PENDING filterida: ${matchesStatus} (confirmed:${isConfirmed}, finished:${isFinished}, rejected:${isRejected})`);
         } else {
           matchesStatus = a.status === statusFilter;
         }
@@ -215,8 +194,8 @@ const Applications = (): JSX.Element => {
       const fillialObj = fillials.find((f) => f.id === (a.fillial?.id ?? a.fillial_id));
       const fillialRegion = fillialObj?.region ?? (a.fillial && (a.fillial as any).region) ?? null;
       const matchesRegion = regionFilter === "all" || (!fillialRegion && regionFilter === "all") || fillialRegion === regionFilter;
-      const matchesExpiredMonth = expiredMonthFilter === "all" || (a.expired_month && a.expired_month === String(expiredMonthFilter));
-  const matchesMinAmount = (a.amount ?? 0) >= amountRange[0];
+      const matchesExpiredMonth = expiredMonthFilter === "all" || (a.expired_month && Number(a.expired_month) === Number(expiredMonthFilter));
+      const matchesMinAmount = (a.amount ?? 0) >= amountRange[0];
   const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
 
       if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesFillial || !matchesRegion || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
@@ -259,41 +238,52 @@ const Applications = (): JSX.Element => {
 
   return (
     <div>
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-navy-800 p-3">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Jami arizalar</div>
-          <div className="text-lg font-semibold dark:text-white">{stats.totalCount}</div>
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Jami arizalar</div>
+          <div className="text-base sm:text-lg font-semibold dark:text-white">{stats.totalCount}</div>
         </div>
         <div className="rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-navy-800 p-3">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Tasdiqlangan jami</div>
-          <div className="text-lg font-semibold dark:text-white">{formatMoneyWithUZS(stats.approvedAmount)}</div>
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Tasdiqlangan jami</div>
+          <div className="text-base sm:text-lg font-semibold dark:text-white">{formatMoneyWithUZS(stats.approvedAmount)}</div>
         </div>
-        <div className="rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-navy-800 p-3">
-          <div className="text-sm text-gray-500 dark:text-gray-400">To'landi / To'lanmadi (tasdiqlangan)</div>
-          <div className="text-lg font-semibold dark:text-white">{formatMoneyWithUZS(stats.approvedPaidAmount)} / {formatMoneyWithUZS(stats.approvedUnpaidAmount)}</div>
+        <div className="rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-navy-800 p-3 sm:col-span-2 lg:col-span-1">
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">To'landi / To'lanmadi</div>
+          <div className="text-base sm:text-lg font-semibold dark:text-white">{formatMoneyWithUZS(stats.approvedPaidAmount)} / {formatMoneyWithUZS(stats.approvedUnpaidAmount)}</div>
         </div>
       </div>
-      <div className="flex items-center justify-start">
+      
+      <div className="mb-4 space-y-3">
+        {/* Row 1: Search only */}
+        <div className="relative w-full sm:w-80 lg:w-96">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-full text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            placeholder="Ism yoki telefon raqam bo'yicha qidirish"
+            title="Ism yoki telefon raqam bo'yicha qidirish"
+            aria-label="Ism yoki telefon raqam bo'yicha qidirish"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        
+        {/* Row 2: Date Picker only */}
+        <DateRangePicker 
+          startDate={startDate} 
+          endDate={endDate} 
+          onStartChange={setStartDate} 
+          onEndChange={setEndDate}
+        />
+        
+        {/* Row 3: All Filters and Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-80 md:w-96 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              placeholder="Ism yoki telefon raqam bo'yicha qidirish"
-              title="Ism yoki telefon raqam bo'yicha qidirish"
-              aria-label="Ism yoki telefon raqam bo'yicha qidirish"
-            />
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-            <DateRangePicker startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} />
           <CustomSelect
             value={statusFilter}
             onChange={setStatusFilter}
             options={statuses}
-            className="min-w-[140px]"
+            className="w-full sm:w-auto sm:min-w-[140px]"
           />
           <CustomSelect
             value={paidFilter}
@@ -303,9 +293,8 @@ const Applications = (): JSX.Element => {
               { value: "paid", label: "To'landi" },
               { value: "unpaid", label: "To'lanmadi" }
             ]}
-            className="min-w-[130px]"
+            className="w-full sm:w-auto sm:min-w-[130px]"
           />
-
           <CustomSelect
             value={String(fillialFilter)}
             onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
@@ -313,67 +302,78 @@ const Applications = (): JSX.Element => {
               { value: "all", label: "Barcha filiallar" },
               ...(Array.isArray(fillialsList) ? fillialsList : []).map(f => ({ value: String(f.id), label: f.name }))
             ]}
-            className="min-w-[150px]"
+            className="w-full sm:w-auto sm:min-w-[150px]"
           />
+          <CustomSelect
+            value={regionFilter}
+            onChange={setRegionFilter}
+            options={regions.map(r => ({ 
+              value: r, 
+              label: r === "all" ? "Barcha hududlar" : r 
+            }))}
+            className="w-full sm:w-auto sm:min-w-[140px]"
+          />
+          <CustomSelect
+            value={String(expiredMonthFilter)}
+            onChange={(value) => setExpiredMonthFilter(value === "all" ? "all" : Number(value))}
+            options={[
+              { value: "all", label: "Barcha oylar" },
+              { value: "3", label: "3 oy" },
+              { value: "6", label: "6 oy" },
+              { value: "9", label: "9 oy" },
+              { value: "12", label: "12 oy" }
+            ]}
+            className="w-full sm:w-auto sm:min-w-[120px]"
+          />
+          <CustomSelect
+            value={String(pageSize)}
+            onChange={(value) => setPageSize(Number(value))}
+            options={[
+              { value: "5", label: "5 ta" },
+              { value: "10", label: "10 ta" },
+              { value: "25", label: "25 ta" },
+              { value: "50", label: "50 ta" },
+              { value: "100", label: "100 ta" }
+            ]}
+            className="w-full sm:w-auto sm:min-w-[100px]"
+          />
+          
+          <button
+            onClick={async () => {
+              const dateLabel = startDate || endDate ? `${startDate || "-"} — ${endDate || "-"}` : "Barcha sanalar";
+              const apps = filtered.map((a) => ({
+                ID: a.id,
+                "F.I.Sh": a.fullname,
+                Telefon: a.phone ?? "",
+                Summa: a.amount ?? 0,
+                Holat: a.status ?? "",
+                Filial: a.fillial?.name ?? "",
+                Yaratildi: formatDateNoSeconds(a.createdAt) ?? "",
+              }));
+              exportSingleTable({ rows: apps, title: "Arizalar", dateLabel });
+            }}
+            className="w-full sm:w-auto h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 px-3 sm:px-4 text-white inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="7 10 12 15 17 10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="12" y1="15" x2="12" y2="3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hidden sm:inline">Yuklab olish</span>
+            <span className="sm:hidden">Excel</span>
+          </button>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full sm:w-auto h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-3 sm:px-4 text-white inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap transition-all duration-200 active:scale-95"
+            title="Sahifani yangilash"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hidden sm:inline">Yangilash</span>
+          </button>
         </div>
-      </div>
-
-      {/* Row 2: Regions + Page size and export controls */}
-      <div className="mt-4 flex items-center justify-start gap-3">
-        <CustomSelect
-          value={regionFilter}
-          onChange={setRegionFilter}
-          options={regions.map(r => ({ 
-            value: r, 
-            label: r === "all" ? "Barcha hududlar" : r 
-          }))}
-          className="min-w-[140px]"
-        />
-        
-        <CustomSelect
-          value={String(expiredMonthFilter)}
-          onChange={(value) => setExpiredMonthFilter(value === "all" ? "all" : Number(value))}
-          options={[
-            { value: "all", label: "Barcha oylar" },
-            { value: "3", label: "3 oy" },
-            { value: "6", label: "6 oy" },
-            { value: "9", label: "9 oy" },
-            { value: "12", label: "12 oy" }
-          ]}
-          className="min-w-[120px]"
-        />
-        
-        <CustomSelect
-          value={String(pageSize)}
-          onChange={(value) => setPageSize(Number(value))}
-          options={[
-            { value: "5", label: "5 ta" },
-            { value: "10", label: "10 ta" },
-            { value: "25", label: "25 ta" },
-            { value: "50", label: "50 ta" },
-            { value: "100", label: "100 ta" }
-          ]}
-          className="min-w-[120px]"
-        />
-        
-        <button
-          onClick={async () => {
-            const dateLabel = startDate || endDate ? `${startDate || "-"} — ${endDate || "-"}` : "All dates";
-            const apps = filtered.map((a) => ({
-              ID: a.id,
-              Fullname: a.fullname,
-              Phone: a.phone ?? "",
-              Amount: a.amount ?? 0,
-              Status: a.status ?? "",
-              Fillial: a.fillial?.name ?? "",
-              Created: formatDateNoSeconds(a.createdAt) ?? "",
-            }));
-            exportSingleTable({ rows: apps, title: "Applications", dateLabel });
-          }}
-          className="h-10 rounded bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 px-3 text-white"
-        >
-          Arizalarni Eksport Qilish
-        </button>
       </div>
 
       {/* Row 3: Slider on its own line with 1/4 width */}
@@ -425,20 +425,20 @@ const Applications = (): JSX.Element => {
       </div>
 
       <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
-        <table className="w-full table-auto min-w-[640px]">
-          <thead className="bg-gray-50 dark:bg-navy-800 text-left text-sm text-gray-600 dark:text-gray-300">
+        <table className="w-full table-auto min-w-[800px]">
+          <thead className="bg-gray-50 dark:bg-navy-800 text-left text-xs sm:text-sm text-gray-600 dark:text-gray-300">
             <tr>
-              <th className="px-4 py-3 text-center">ID</th>
-              <th className="px-4 py-3">Ariza beruvchi</th>
-              <th className="px-4 py-3 text-center min-w-[130px]">Telefon</th>
-              <th className="px-4 py-3 text-center min-w-[140px]">Mahsulotlar / Summa (UZS)</th>
-              <th className="px-4 py-3 text-center min-w-[160px]">To'lov / Limit (UZS)</th>
-              <th className="px-4 py-3 text-center">To'lov</th>
-              <th className="px-4 py-3 text-center min-w-[120px]">Filial</th>
-              <th className="px-4 py-3 text-center">Grafik</th>
-              <th className="px-6 py-3 text-center min-w-[160px]">Holat</th>
-              <th className="px-4 py-3 text-center">Muddati</th>
-              <th className="px-4 py-3 text-center">Yaratildi</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">ID</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3">Ariza beruvchi</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Telefon</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden md:table-cell">Summa</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden lg:table-cell">To'lov/Limit</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden sm:table-cell">To'lov</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden xl:table-cell">Filial</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Grafik</th>
+              <th className="px-2 sm:px-6 py-2 sm:py-3 text-center">Holat</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden lg:table-cell">Muddat</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden xl:table-cell">Yaratildi</th>
             </tr>
           </thead>
           <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
@@ -451,11 +451,9 @@ const Applications = (): JSX.Element => {
                     setDetailLoading(true);
                     // Fetch complete application data with all relations
                     const fullApplication = await api.getZayavka(a.id);
-                    console.log('Full application data:', fullApplication);
                     setSelected(fullApplication);
                     setOpen(true);
                   } catch (err) {
-                    console.error("Error fetching application details:", err);
                     // Show error message to user
                     setToastMessage("Ariza tafsilotlarini yuklashda xatolik yuz berdi");
                     setToastType('error');
@@ -468,17 +466,17 @@ const Applications = (): JSX.Element => {
                   }
                 }}
               >
-                <td className="px-4 py-2 text-center">{a.id}</td>
-                <td className="px-4 py-2">
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm">{a.id}</td>
+                <td className="px-2 sm:px-4 py-2">
                   <AvatarName
                     image={(a.user as any)?.image ?? null}
                     name={a.fullname}
                     subtitle={a.passport ?? undefined}
-                    size="md"
+                    size="sm"
                   />
                 </td>
-                <td className="px-4 py-2 text-center min-w-[130px] whitespace-nowrap">{formatPhone(a.phone)}</td>
-                <td className="px-4 py-2 text-center min-w-[140px] whitespace-nowrap">
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap">{formatPhone(a.phone)}</td>
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden md:table-cell">
                   {(a.products && a.products.length > 0) || a.amount ? (
                     <div className="flex flex-col gap-1">
                       <span className="font-medium">{a.products && a.products.length > 0 ? `${a.products.length} dona` : "-"}</span>
@@ -488,7 +486,7 @@ const Applications = (): JSX.Element => {
                     <span className="text-gray-400 dark:text-gray-500">-</span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-center min-w-[160px] whitespace-nowrap">
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden lg:table-cell">
                   {(a.payment_amount || a.amount) && a.limit ? (
                     <div className="flex flex-col gap-0">
                       <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</span>
@@ -502,9 +500,18 @@ const Applications = (): JSX.Element => {
                     <span className="text-gray-400 dark:text-gray-500">-</span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-center">{a.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</td>
-                <td className="px-4 py-2 text-center min-w-[120px] whitespace-nowrap">{a.fillial?.name ?? "-"}</td>
-                <td className="px-4 py-2 text-center">
+                <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">
+                  {(() => {
+                    const st = (a.status ?? "").toUpperCase();
+                    const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+                    if (!isFinished) return <span className="text-gray-400 dark:text-gray-500">-</span>;
+                    return a.paid ? 
+                      <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : 
+                      <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>;
+                  })()}
+                </td>
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden xl:table-cell">{a.fillial?.name ?? "-"}</td>
+                <td className="px-2 sm:px-4 py-2 text-center">
                   {isApproved(a.status) ? (
                     <button
                       onClick={async (e) => {
@@ -533,7 +540,6 @@ const Applications = (): JSX.Element => {
                           link.remove();
                           URL.revokeObjectURL(url);
                         } catch (err) {
-                          console.error(err);
                           setToastMessage("Grafikni yuklab olishda xatolik yuz berdi");
                           setToastType('error');
                           setToastOpen(true);
@@ -567,8 +573,8 @@ const Applications = (): JSX.Element => {
                     <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-6 py-2 text-center min-w-[160px]">{(() => { const b = appStatusBadge(a.status, true); return <span className={b.className}>{b.label}</span>; })()}</td>
-                <td className="px-4 py-2 text-center">
+                <td className="px-2 sm:px-6 py-2 text-center">{(() => { const b = appStatusBadge(a.status, true); return <span className={b.className}>{b.label}</span>; })()}</td>
+                <td className="px-2 sm:px-4 py-2 text-center hidden lg:table-cell">
                   {a.expired_month ? (
                     <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
                       {a.expired_month} oy
@@ -577,7 +583,7 @@ const Applications = (): JSX.Element => {
                     <span className="text-gray-400 dark:text-gray-500">-</span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-center">{formatDate24Hour(a.createdAt)}</td>
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm hidden xl:table-cell">{formatDate24Hour(a.createdAt)}</td>
               </tr>
             ))}
             <DetailModal
@@ -689,8 +695,8 @@ const Applications = (): JSX.Element => {
         </table>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>
+      <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>
         <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
       </div>
       

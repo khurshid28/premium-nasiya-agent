@@ -33,7 +33,7 @@ const Sidebar = (props: {
       {/* Nav item */}
 
       <ul className="mb-auto pt-12">
-        <Links routes={routes} />
+        <Links routes={routes} onClose={onClose} />
       </ul>
 
       {/* Free Horizon Card removed */}
