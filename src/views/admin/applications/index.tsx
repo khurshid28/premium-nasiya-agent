@@ -278,12 +278,12 @@ const Applications = (): JSX.Element => {
         />
         
         {/* Row 3: All Filters and Actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
           <CustomSelect
             value={statusFilter}
             onChange={setStatusFilter}
             options={statuses}
-            className="w-full sm:w-auto sm:min-w-[140px]"
+            className="flex-1 min-w-[140px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={paidFilter}
@@ -293,7 +293,7 @@ const Applications = (): JSX.Element => {
               { value: "paid", label: "To'landi" },
               { value: "unpaid", label: "To'lanmadi" }
             ]}
-            className="w-full sm:w-auto sm:min-w-[130px]"
+            className="flex-1 min-w-[130px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={String(fillialFilter)}
@@ -302,7 +302,7 @@ const Applications = (): JSX.Element => {
               { value: "all", label: "Barcha filiallar" },
               ...(Array.isArray(fillialsList) ? fillialsList : []).map(f => ({ value: String(f.id), label: f.name }))
             ]}
-            className="w-full sm:w-auto sm:min-w-[150px]"
+            className="flex-1 min-w-[150px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={regionFilter}
@@ -311,7 +311,7 @@ const Applications = (): JSX.Element => {
               value: r, 
               label: r === "all" ? "Barcha hududlar" : r 
             }))}
-            className="w-full sm:w-auto sm:min-w-[140px]"
+            className="flex-1 min-w-[140px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={String(expiredMonthFilter)}
@@ -323,7 +323,7 @@ const Applications = (): JSX.Element => {
               { value: "9", label: "9 oy" },
               { value: "12", label: "12 oy" }
             ]}
-            className="w-full sm:w-auto sm:min-w-[120px]"
+            className="flex-1 min-w-[120px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={String(pageSize)}
@@ -335,7 +335,7 @@ const Applications = (): JSX.Element => {
               { value: "50", label: "50 ta" },
               { value: "100", label: "100 ta" }
             ]}
-            className="w-full sm:w-auto sm:min-w-[100px]"
+            className="flex-1 min-w-[100px] sm:flex-initial sm:w-auto"
           />
           
           <button
