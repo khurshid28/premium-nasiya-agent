@@ -114,7 +114,7 @@ export default function SignIn(): JSX.Element {
         className="w-full max-w-[420px] flex-col items-center"
       >
         <h4 className="mb-2.5 text-4xl font-bold text-navy-700 dark:text-white">
-          Tizimga kirish
+          Agent sifatida kirish
         </h4>
         <p className="mb-6 ml-1 text-base text-gray-600">Login va parolingizni kiriting</p>
 

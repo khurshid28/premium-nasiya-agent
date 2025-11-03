@@ -26,7 +26,7 @@ const Sidebar = (props: {
       <div className={`mx-[56px] mt-[50px] flex items-center`}>
         <div className="mt-1 ml-1 flex items-center text-[20px] font-bold uppercase text-navy-700 dark:text-white">
           <img src="/pp.png" alt="logo" className="mr-3 h-8 w-8 rounded-full object-cover" />
-          <span className="text-[18px]">Admin</span>
+          <span className="text-[18px]">Agent</span>
         </div>
       </div>
       <div className="mt-[58px] mb-7 h-px bg-gray-300 dark:bg-white/30" />
