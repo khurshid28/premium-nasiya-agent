@@ -49,9 +49,9 @@ export default function SignIn(): JSX.Element {
       // Real API call
       const response = await apiLogin(login.trim(), password.trim());
       
-      // Check if user has ADMIN role
-      if (response.user.role !== "ADMIN") {
-        setAuthError("Kirish rad etildi. Faqat administratorlar tizimga kirishlari mumkin.");
+      // Check if user has AGENT role
+      if (response.user.role !== "AGENT") {
+        setAuthError("Kirish rad etildi. Faqat agentlar tizimga kirishlari mumkin.");
         // Clear any stored data
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
