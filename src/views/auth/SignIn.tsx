@@ -68,8 +68,8 @@ export default function SignIn(): JSX.Element {
         role: response.user.role,
       });
       
-      // Navigate to admin default
-      navigate("/admin/dashboard");
+      // Navigate to agent default
+      navigate("/agent/dashboard");
     } catch (err: any) {
       console.error("Login error:", err);
       

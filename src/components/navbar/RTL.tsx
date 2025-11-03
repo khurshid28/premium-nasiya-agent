@@ -158,7 +158,7 @@ const Navbar = (props: {
               {/* Actions */}
               <div className="p-2 space-y-1">
                 <button
-                  onClick={() => navigate("/admin/info")}
+                  onClick={() => navigate("/agent/info")}
                   className="w-full rounded-md px-3 py-2 text-start text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-white/10 flex items-center gap-2"
                 >
                   <IoMdInformationCircleOutline className="h-4 w-4" />

@@ -51,7 +51,7 @@ export default function Admin(props: { [x: string]: any }) {
   const getRoutes = (routes: RoutesType[] = []): any => {
     if (!routes || routes.length === 0) return null;
     return routes.map((prop, key) => {
-      if (prop.layout === "/admin") {
+      if (prop.layout === "/agent") {
         return (
           <Route path={`/${prop.path}`} element={prop.component} key={key} />
         );
@@ -85,7 +85,7 @@ export default function Admin(props: { [x: string]: any }) {
 
                 <Route
                   path="/"
-                  element={<Navigate to="/admin/dashboard" replace />}
+                  element={<Navigate to="/agent/dashboard" replace />}
                 />
               </Routes>
             </div>

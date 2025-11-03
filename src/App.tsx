@@ -13,11 +13,11 @@ const App = () => {
     <UserProvider>
       <Routes>
         <Route path="auth/*" element={<AuthLayout />} />
-        <Route path="admin/*" element={<AdminLayout />} />
+        <Route path="agent/*" element={<AdminLayout />} />
         <Route path="/sign-in" element={<Navigate to="/auth/sign-in" replace />} />
         <Route
           path="/"
-          element={isAuth ? <Navigate to="/admin" replace /> : <Navigate to="/auth/sign-in" replace />}
+          element={isAuth ? <Navigate to="/agent" replace /> : <Navigate to="/auth/sign-in" replace />}
         />
       </Routes>
       {/* <ToastContainer onClose={() => setToastOpen(false)} /> */}

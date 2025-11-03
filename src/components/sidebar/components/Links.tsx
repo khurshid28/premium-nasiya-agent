@@ -25,7 +25,7 @@ export const SidebarLinks = (props: { routes: RoutesType[]; onClose?: React.Mous
       // Skip hidden routes (e.g., Profile removed from sidebar)
       // @ts-ignore allow optional hidden flag on route objects
       if ((route as any).hidden) return null;
-      if (route.layout === "/admin") {
+      if (route.layout === "/agent") {
         return (
           <Link key={index} to={route.layout + "/" + route.path} onClick={handleLinkClick}>
             <div className="relative mb-3 flex hover:cursor-pointer">

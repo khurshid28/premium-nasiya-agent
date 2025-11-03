@@ -1,6 +1,6 @@
 import React from "react";
 
-// Admin Imports
+// Agent Imports
 import MainDashboard from "views/admin/default";
 import Profile from "views/admin/profile";
 import Fillials from "views/admin/fillials";
@@ -17,14 +17,14 @@ import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report } from
 const routes = [
   {
     name: "Boshqaruv paneli",
-    layout: "/admin",
+    layout: "/agent",
     path: "dashboard",
   icon: <LayoutDashboard size={20} />,
     component: <MainDashboard />,
   },
   // {
   //   name: "NFT Marketplace",
-  //   layout: "/admin",
+  //   layout: "/agent",
   //   path: "nft-marketplace",
   //   icon: <MdOutlineShoppingCart className="h-6 w-6" />,
   //   component: <NFTMarketplace />,
@@ -32,57 +32,57 @@ const routes = [
   // },
   // {
   //   name: "Data Tables",
-  //   layout: "/admin",
+  //   layout: "/agent",
   //   icon: <MdBarChart className="h-6 w-6" />,
   //   path: "data-tables",
   //   component: <DataTables />,
   // },
   {
     name: "Profile",
-    layout: "/admin",
+    layout: "/agent",
     path: "profile",
     icon: <User size={20} />,
     component: <Profile />,
     hidden: true,
   },
   // {
-  //   name: "Admin Dashboard",
-  //   layout: "/admin",
-  //   path: "admin-dashboard",
+  //   name: "Agent Dashboard",
+  //   layout: "/agent",
+  //   path: "agent-dashboard",
   //   icon: <MdBarChart className="h-6 w-6" />,
-  //   component: <AdminDashboard />,
+  //   component: <AgentDashboard />,
   // },
   {
     name: "Filiallar",
-    layout: "/admin",
+    layout: "/agent",
     path: "fillials",
   icon: <Home size={20} />,
     component: <Fillials />,
   },
   {
     name: "Operatorlar",
-    layout: "/admin",
+    layout: "/agent",
     path: "users",
   icon: <User size={20} />,
     component: <Users />,
   },
   {
     name: "Arizalar",
-    layout: "/admin",
+    layout: "/agent",
     path: "applications",
   icon: <FileText size={20} />,
     component: <Applications />,
   },
   {
     name: "Ma'lumot",
-    layout: "/admin",
+    layout: "/agent",
     path: "info",
     icon: <InfoCircle size={20} />,
     component: <InfoPage />,
   },
   {
     name: "Hisobotlar",
-    layout: "/admin",
+    layout: "/agent",
     path: "reports",
     icon: <Report size={20} />,
     component: <ReportsPage />,

@@ -82,7 +82,7 @@ export default function RTL() {
 
                 <Route
                   path="/"
-                  element={<Navigate to="/admin/default" replace />}
+                  element={<Navigate to="/agent/default" replace />}
                 />
               </Routes>
             </div>
