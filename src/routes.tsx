@@ -22,6 +22,13 @@ const routes = [
   icon: <LayoutDashboard size={20} />,
     component: <MainDashboard />,
   },
+  {
+    name: "Boshqaruv paneli",
+    layout: "/demo",
+    path: "dashboard",
+  icon: <LayoutDashboard size={20} />,
+    component: <MainDashboard />,
+  },
   // {
   //   name: "NFT Marketplace",
   //   layout: "/agent",
@@ -60,8 +67,22 @@ const routes = [
     component: <Fillials />,
   },
   {
+    name: "Filiallar",
+    layout: "/demo",
+    path: "fillials",
+  icon: <Home size={20} />,
+    component: <Fillials />,
+  },
+  {
     name: "Operatorlar",
     layout: "/agent",
+    path: "users",
+  icon: <User size={20} />,
+    component: <Users />,
+  },
+  {
+    name: "Operatorlar",
+    layout: "/demo",
     path: "users",
   icon: <User size={20} />,
     component: <Users />,
@@ -74,6 +95,13 @@ const routes = [
     component: <Applications />,
   },
   {
+    name: "Arizalar",
+    layout: "/demo",
+    path: "applications",
+  icon: <FileText size={20} />,
+    component: <Applications />,
+  },
+  {
     name: "Ma'lumot",
     layout: "/agent",
     path: "info",
@@ -81,8 +109,22 @@ const routes = [
     component: <InfoPage />,
   },
   {
+    name: "Ma'lumot",
+    layout: "/demo",
+    path: "info",
+    icon: <InfoCircle size={20} />,
+    component: <InfoPage />,
+  },
+  {
     name: "Hisobotlar",
     layout: "/agent",
+    path: "reports",
+    icon: <Report size={20} />,
+    component: <ReportsPage />,
+  },
+  {
+    name: "Hisobotlar",
+    layout: "/demo",
     path: "reports",
     icon: <Report size={20} />,
     component: <ReportsPage />,

@@ -1,7 +1,7 @@
 import React from "react";
 import Dropdown from "components/dropdown";
 import { FiAlignJustify, FiUser } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "contexts/UserContext";
 
 import { FiSearch } from "react-icons/fi";
@@ -10,6 +10,7 @@ import {
   IoMdInformationCircleOutline,
 } from "react-icons/io";
 import api from "lib/api";
+import demoApi from "lib/demoApi";
 import DetailModal from "components/modal/DetailModalNew";
 import { appStatusBadge } from "lib/formatters";
 
@@ -20,7 +21,13 @@ const Navbar = (props: {
 }) => {
   const { onOpenSidenav, brandText } = props;
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useUser();
+  
+  // Determine which API to use based on route
+  const currentApi = React.useMemo(() => {
+    return location.pathname.startsWith('/demo') ? demoApi : api;
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -87,9 +94,9 @@ const Navbar = (props: {
       try {
         // Global search - barcha ma'lumotlarni olib, client-side da search qilish
         const [usersRes, appsRes, filsRes] = await Promise.all([
-          api.listUsers({}),
-          api.listApplications({}),
-          api.listFillials({}),
+          currentApi.listUsers({}),
+          currentApi.listApplications({}),
+          currentApi.listFillials({}),
         ]);
         const searchLower = query.toLowerCase();
         const list: SearchItem[] = [];
@@ -181,7 +188,7 @@ const Navbar = (props: {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, currentApi]);
 
   React.useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -235,12 +242,15 @@ const Navbar = (props: {
                 setSelectedIndex(-1);
                 
                 // Navigate to appropriate page
+                const isDemoMode = location.pathname.startsWith('/demo');
+                const baseRoute = isDemoMode ? '/demo' : '/agent';
+                
                 if (selectedResult.type === "operator") {
-                  navigate("/agent/users");
+                  navigate(`${baseRoute}/users`);
                 } else if (selectedResult.type === "application") {
-                  navigate("/agent/applications");
+                  navigate(`${baseRoute}/applications`);
                 } else if (selectedResult.type === "fillial") {
-                  navigate("/agent/fillials");
+                  navigate(`${baseRoute}/fillials`);
                 }
                 // Then show modal
                 setTimeout(() => setSelected(selectedResult), 100);
@@ -276,13 +286,17 @@ const Navbar = (props: {
                         setShowResults(false);
                         setQuery("");
                         setSelectedIndex(-1);
+                        
                         // Navigate to appropriate page
+                        const isDemoMode = location.pathname.startsWith('/demo');
+                        const baseRoute = isDemoMode ? '/demo' : '/agent';
+                        
                         if (r.type === "operator") {
-                          navigate("/agent/users");
+                          navigate(`${baseRoute}/users`);
                         } else if (r.type === "application") {
-                          navigate("/agent/applications");
+                          navigate(`${baseRoute}/applications`);
                         } else if (r.type === "fillial") {
-                          navigate("/agent/fillials");
+                          navigate(`${baseRoute}/fillials`);
                         }
                         // Then show modal
                         setTimeout(() => setSelected(r), 100);

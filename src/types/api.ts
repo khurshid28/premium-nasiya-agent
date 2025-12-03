@@ -84,6 +84,33 @@ export interface Fillial {
   merchant?: Merchant | null;
 }
 
+export interface Agent {
+  id: number;
+  fullname: string;
+  image?: string | null;
+  phone?: string | null;
+  password?: string | null; // typically not returned by API
+  role?: Role;
+  work_status?: WORK_STATUS;
+  createdAt?: string;
+  updatedAt?: string | null;
+  fillials?: Fillial[];
+}
+
+export interface Admin {
+  id: number;
+  fullname: string;
+  image?: string | null;
+  phone?: string | null;
+  password?: string | null; // typically not returned by API
+  merchant_id?: number | null;
+  merchant?: Merchant | null;
+  role?: Role;
+  work_status?: WORK_STATUS;
+  createdAt?: string;
+  updatedAt?: string | null;
+}
+
 export interface User {
   id: number;
   fullname: string;

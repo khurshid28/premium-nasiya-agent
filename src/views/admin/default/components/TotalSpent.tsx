@@ -9,7 +9,9 @@ import {
 } from "variables/charts";
 import LineChart from "components/charts/LineChart";
 import CustomSelect from "components/dropdown/CustomSelect";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { isApproved } from "lib/formatters";
 
 interface TotalSpentProps {
@@ -31,6 +33,12 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = React.useMemo(() => {
+    const isDemo = location.pathname.startsWith('/demo');
+    return isDemo ? demoApi : apiReal;
+  }, [location.pathname]);
+  
   const [totalData, setTotalData] = React.useState({
     count: 0,
     totalAmount: 0,
@@ -221,7 +229,7 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
     };
 
     loadTotalData();
-  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
+  }, [api, timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
   return (
     <Card extra="!p-[20px] text-center">
       <div className="flex justify-between">

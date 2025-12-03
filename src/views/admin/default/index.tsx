@@ -1,5 +1,7 @@
 import React from "react";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import DateRangePicker from "components/DateRangePicker";
 import CustomSelect from "components/dropdown/CustomSelect";
 // formatShortMoney removed (unused in this view)
@@ -15,6 +17,12 @@ import { IoMdHome } from "react-icons/io";
 import { isApproved, isPending } from "lib/formatters";
 
 const Dashboard = (): JSX.Element => {
+  const location = useLocation();
+  const api = React.useMemo(() => {
+    const isDemo = location.pathname.startsWith('/demo');
+    return isDemo ? demoApi : apiReal;
+  }, [location.pathname]);
+  
   const [fillials, setFillials] = React.useState<any[]>([]);
   const [usersCount, setUsersCount] = React.useState<number>(0);
   const [applicationsCount, setApplicationsCount] = React.useState<number>(0);
@@ -50,7 +58,7 @@ const Dashboard = (): JSX.Element => {
       mounted = false; 
       controller.abort();
     };
-  }, []);
+  }, [api]);
 
   // fetch global counts for dashboard widgets with filters applied
   React.useEffect(() => {
@@ -190,7 +198,7 @@ const Dashboard = (): JSX.Element => {
       abortController.abort();
       clearTimeout(timeoutId);
     };
-  }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth]);
+  }, [api, startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth]);
 
   // metrics are provided by the reusable dashboard components in ./components
 

@@ -1,7 +1,5 @@
 import React from "react";
 import { Range } from "react-range";
-import { useLocation } from "react-router-dom";
-import apiReal from "lib/api";
 import demoApi from "lib/demoApi";
 import Pagination from "components/pagination";
 import DetailModal from "components/modal/DetailModalNew";
@@ -12,7 +10,7 @@ import { formatPhone, formatMoney, formatMoneyWithUZS, appStatusBadge, formatDat
 import { exportSingleTable } from "lib/exportExcel";
 import Toast from "components/toast/ToastNew";
 
-// Mapped to your Prisma `Zayavka` model (named Zayavka in Prisma). Adjust names if needed.
+// Same type as original Applications
 type Application = {
   id: number;
   fullname: string;
@@ -25,7 +23,7 @@ type Application = {
   percent?: number | null;
   amount?: number | null;
   payment_amount?: number | null;
-  status?: string | null; // STATUS enum
+  status?: string | null;
   fillial_id?: number;
   bank_id?: number;
   request_id?: string | null;
@@ -33,24 +31,20 @@ type Application = {
   updatedAt?: string | null;
   merchant?: { id: number; name: string } | null;
   fillial?: { id: number; name: string } | null;
-  user?: { id: number; fullname: string } | null;
+  user?: { id: number; fullname: string; phone?: string | null; image?: string | null } | null;
   myid_id?: number | null;
   paid?: boolean | null;
   fcmToken?: string | null;
   products?: { id: number; name: string; price: number; count?: number | null }[];
 };
 
-
-
-const Applications = (): JSX.Element => {
-  const location = useLocation();
-  const api = React.useMemo(() => {
-    const isDemo = location.pathname.startsWith('/demo');
-    return isDemo ? demoApi : apiReal;
-  }, [location.pathname]);
-
+const DemoApplications = (): JSX.Element => {
   const [applications, setApplications] = React.useState<Application[]>([]);
   const [fillialsList, setFillialsList] = React.useState<any[]>([]);
+  const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [agents, setAgents] = React.useState<any[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
+  const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [paidFilter, setPaidFilter] = React.useState("all");
@@ -64,21 +58,61 @@ const Applications = (): JSX.Element => {
   const [open, setOpen] = React.useState(false);
   const [detailLoading, setDetailLoading] = React.useState(false);
   
-  // Client-side pagination state
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(10);
   
-  // Toast state
   const [toastMessage, setToastMessage] = React.useState<string>("");
   const [toastOpen, setToastOpen] = React.useState<boolean>(false);
   const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
   
-  // Download loading state
   const [downloadLoading, setDownloadLoading] = React.useState<{[key: string]: boolean}>({});
   
   const SLIDER_MIN = 0;
-  const SLIDER_MAX = 50000000; // 50 million UZS
+  const SLIDER_MAX = 50000000;
   const SLIDER_STEP = 10000;
+
+  const generateCopyText = (app: Application): string => {
+    let text = `👤 Ariza beruvchi:\n${app.fullname}\n${app.passport || ''}\n\n`;
+    text += `📱 Telefon: ${formatPhone(app.phone)}\n`;
+    text += `🛒 Tovarlar summasi: ${formatMoney(app.amount)}\n`;
+    text += `💰 To'lov summasi: ${formatMoney(app.payment_amount || app.amount)}\n`;
+    text += `💳 To'lov: ${app.paid ? "✅ To'landi" : "❌ To'lanmadi"}\n`;
+    text += `🏢 Filial: ${app.fillial?.name ?? "-"}\n`;
+    
+    if ((app as any).request?.orderid) {
+      text += `📦 Order ID: #${(app as any).request.orderid}\n`;
+    }
+    
+    const loanId = (app as any).request?.loanid;
+    if (loanId) {
+      text += `💳 KREDIT ID: #${loanId}\n`;
+    }
+    
+    if (app.user) {
+      text += `\n👨‍💼 Operator ma'lumotlari:\n`;
+      text += `   • F.I.O: ${app.user.fullname}\n`;
+      if (app.user.phone) text += `   • Telefon: ${formatPhone(app.user.phone)}\n`;
+      text += `   • ID: #${app.user.id}\n`;
+    }
+    
+    text += `\n`;
+    if (app.phone2) text += `📞 Qo'shimcha telefon: ${formatPhone(app.phone2)}\n`;
+    if (app.limit) text += `💵 Limit: ${formatMoney(app.limit)}\n`;
+    if (app.expired_month) text += `📅 Muddat (oy): ${app.expired_month}\n`;
+    if (app.percent) text += `📊 Foiz: ${app.percent}%\n`;
+    if (app.createdAt) text += `🗓 Yaratilgan sana: ${formatDateNoSeconds(app.createdAt)}\n`;
+    if (app.canceled_reason) text += `❌ Bekor qilish sababi: ${app.canceled_reason}\n`;
+    text += `📈 Holat: ${appStatusBadge(app.status).label}\n`;
+    
+    if (app.products && app.products.length > 0) {
+      text += `\n🛍️ Mahsulotlar:\n`;
+      app.products.forEach((p, idx) => {
+        text += `   ${idx + 1}. ${p.name} - ${formatMoney(p.price)} - ${p.count ?? 1} ta\n`;
+      });
+    }
+    
+    return text;
+  };
 
   const statuses = React.useMemo(() => {
     return [
@@ -100,38 +134,37 @@ const Applications = (): JSX.Element => {
 
   React.useEffect(() => {
     let mounted = true;
-    const abortController = new AbortController();
     
-    // Add delay to prevent rapid navigation issues
-    const timeoutId = setTimeout(async () => {
-      if (!mounted || abortController.signal.aborted) return;
-      
+    const fetchData = async () => {
       try {
-        const [appsRes, fillialsRes] = await Promise.all([
-          api.listApplications({}),
-          api.listFillials({})
+        const [appsRes, fillialsRes, merchantsRes, agentsRes] = await Promise.all([
+          demoApi.listApplications({}),
+          demoApi.listFillials({}),
+          demoApi.listMerchants({ page: 1, pageSize: 100 }),
+          demoApi.listAgents({ page: 1, pageSize: 100 })
         ]);
         
-        if (!mounted || abortController.signal.aborted) return;
+        if (!mounted) return;
         
         const apps = appsRes?.items || [];
         setApplications(apps);
         setFillialsList(fillialsRes?.items || []);
+        setMerchants(merchantsRes?.items || []);
+        setAgents(agentsRes?.items || []);
       } catch (err: any) {
-        if (!mounted || abortController.signal.aborted) return;
-        if (err.name === 'AbortError') return;
-        
+        if (!mounted) return;
         setApplications([]);
         setFillialsList([]);
+        setMerchants([]);
       }
-    }, 150);
+    };
+    
+    fetchData();
     
     return () => {
       mounted = false;
-      abortController.abort();
-      clearTimeout(timeoutId);
     };
-  }, [api]);
+  }, []);
 
   const filtered = React.useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -146,34 +179,27 @@ const Applications = (): JSX.Element => {
       const passport = (a.passport ?? "").toLowerCase();
       const matchesSearch = !s || fullname.includes(s) || phone.includes(s) || passport.includes(s);
       
-      // Status filter with category matching
       let matchesStatus = true;
       if (statusFilter !== "all") {
         const st = (a.status ?? "").toUpperCase();
         
         if (statusFilter === "CONFIRMED") {
-          // Tasdiqlangan: faqat CONFIRMED status
           matchesStatus = st === "CONFIRMED";
         } else if (statusFilter === "FINISHED") {
-          // Tugatilgan: FINISHED, COMPLETED, ACTIVE statuslari
           matchesStatus = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
         } else if (statusFilter === "REJECTED") {
-          // Rad qilingan: all rejection statuses - more precise matching
           matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || 
                          st === "REJECTED" || st.includes("RAD") || st.includes("SCORING") ||
                          st === "DECLINED" || st === "REFUSED";
         } else if (statusFilter === "LIMIT") {
-          // Limit: LIMIT statuses
           matchesStatus = st === "LIMIT" || st.includes("LIMIT");
         } else if (statusFilter === "PENDING") {
-          // Kutilmoqda: only truly pending statuses, exclude confirmed/finished/rejected
           const isConfirmed = st === "CONFIRMED";
           const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
           const isRejected = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || 
                             st === "REJECTED" || st.includes("RAD") || st.includes("SCORING") ||
                             st === "DECLINED" || st === "REFUSED";
           
-          // Only truly pending if not in other categories
           matchesStatus = !isConfirmed && !isFinished && !isRejected && 
                          (st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || 
                           st === "ADDED_PRODUCT" || st === "PENDING" || st === "NEW" || st === "PROCESSING");
@@ -182,31 +208,38 @@ const Applications = (): JSX.Element => {
         }
       }
       
-      // Payment filter: only applies to finished/completed applications
       let matchesPaid = true;
       if (paidFilter !== "all") {
         const st = (a.status ?? "").toUpperCase();
         const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
         
         if (paidFilter === "paid") {
-          // To'landi: only finished applications that are paid
           matchesPaid = isFinished && a.paid === true;
         } else if (paidFilter === "unpaid") {
-          // To'lanmadi: only finished applications that are not paid
           matchesPaid = isFinished && (a.paid === false || a.paid == null);
         }
       }
       const matchesFillial = fillialFilter === "all" || a.fillial_id === Number(fillialFilter);
-      // region may be stored on the fillial object; lookup in fillialsList
       const fillials = Array.isArray(fillialsList) ? fillialsList : [];
       const fillialObj = fillials.find((f) => f.id === (a.fillial?.id ?? a.fillial_id));
       const fillialRegion = fillialObj?.region ?? (a.fillial && (a.fillial as any).region) ?? null;
       const matchesRegion = regionFilter === "all" || (!fillialRegion && regionFilter === "all") || fillialRegion === regionFilter;
+      const matchesMerchant = selectedMerchantId === "all" || (fillialObj && fillialObj.merchant_id === Number(selectedMerchantId));
+      let matchesAgent = true;
+      if (selectedAgentId !== "all") {
+        const agent = agents.find((ag: any) => ag.id === Number(selectedAgentId));
+        if (agent && agent.fillials) {
+          const agentFillialIds = agent.fillials.map((f: any) => f.id);
+          matchesAgent = agentFillialIds.includes(a.fillial_id);
+        } else {
+          matchesAgent = false;
+        }
+      }
       const matchesExpiredMonth = expiredMonthFilter === "all" || (a.expired_month && Number(a.expired_month) === Number(expiredMonthFilter));
       const matchesMinAmount = (a.amount ?? 0) >= amountRange[0];
-  const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
+      const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
 
-      if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesFillial || !matchesRegion || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
+      if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesFillial || !matchesRegion || !matchesMerchant || !matchesAgent || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
 
       if ((start || end) && a.createdAt) {
         const created = new Date(a.createdAt);
@@ -216,12 +249,11 @@ const Applications = (): JSX.Element => {
 
       return true;
     });
-  }, [applications, search, statusFilter, startDate, endDate, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList]);
+  }, [applications, search, statusFilter, startDate, endDate, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList, selectedMerchantId, selectedAgentId, agents]);
 
   const stats = React.useMemo(() => {
     const items = filtered;
     const totalCount = items.length;
-    // For amount stats use only current filtered items (based on status filter)
     const approvedItems = items.filter((a) => a.status === "CONFIRMED" || a.status === "FINISHED" || a.status === "COMPLETED" || a.status === "ACTIVE");
     const approvedAmount = approvedItems.reduce((s, a) => s + (a.amount ?? 0), 0);
     const approvedPaidAmount = approvedItems.filter((a) => a.paid).reduce((s, a) => s + (a.amount ?? 0), 0);
@@ -229,16 +261,17 @@ const Applications = (): JSX.Element => {
     return { totalCount, approvedAmount, approvedPaidAmount, approvedUnpaidAmount };
   }, [filtered]);
 
-  // Client-side pagination
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   
-  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setFillialFilter("all");
+  }, [selectedMerchantId, selectedAgentId]);
+
   React.useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate]);
+  }, [search, statusFilter, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate, selectedMerchantId, selectedAgentId]);
 
-  // Slice data for current page
   const pageData = React.useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
@@ -246,6 +279,18 @@ const Applications = (): JSX.Element => {
 
   return (
     <div>
+      {/* Demo Mode Banner */}
+      <div className="mb-4 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white shadow-lg">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🎭</span>
+          <div>
+            <h3 className="text-lg font-bold">DEMO MODE</h3>
+            <p className="text-sm opacity-90">Bu demo versiya - real ma'lumotlar bilan ishlayapdi</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Rest of the component - same as original Applications */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-navy-800 p-3">
           <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Jami arizalar</div>
@@ -261,23 +306,20 @@ const Applications = (): JSX.Element => {
         </div>
       </div>
       
+      {/* Filters - Same as original */}
       <div className="mb-4 space-y-3">
-        {/* Row 1: Search only */}
         <div className="relative w-full sm:w-80 lg:w-96">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-full text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
             placeholder="Ism yoki telefon raqam bo'yicha qidirish"
-            title="Ism yoki telefon raqam bo'yicha qidirish"
-            aria-label="Ism yoki telefon raqam bo'yicha qidirish"
           />
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
         
-        {/* Row 2: Date Picker only */}
         <DateRangePicker 
           startDate={startDate} 
           endDate={endDate} 
@@ -285,7 +327,6 @@ const Applications = (): JSX.Element => {
           onEndChange={setEndDate}
         />
         
-        {/* Row 3: All Filters and Actions */}
         <div className="flex flex-wrap items-stretch gap-2">
           <CustomSelect
             value={statusFilter}
@@ -304,13 +345,19 @@ const Applications = (): JSX.Element => {
             className="flex-1 min-w-[130px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
-            value={String(fillialFilter)}
-            onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
+            value={String(selectedMerchantId)}
+            onChange={(value) => {
+              setSelectedMerchantId(value === "all" ? "all" : Number(value));
+              setFillialFilter("all");
+            }}
             options={[
-              { value: "all", label: "Barcha filiallar" },
-              ...(Array.isArray(fillialsList) ? fillialsList : []).map(f => ({ value: String(f.id), label: f.name }))
+              { value: "all", label: "Barcha merchantlar" },
+              ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+                value: String(m.id), 
+                label: m.name || `Merchant #${m.id}` 
+              }))
             ]}
-            className="flex-1 min-w-[150px] sm:flex-initial sm:w-auto"
+            className="flex-1 min-w-[160px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={regionFilter}
@@ -320,6 +367,44 @@ const Applications = (): JSX.Element => {
               label: r === "all" ? "Barcha hududlar" : r 
             }))}
             className="flex-1 min-w-[140px] sm:flex-initial sm:w-auto"
+          />
+          <CustomSelect
+            value={String(selectedAgentId)}
+            onChange={(value) => {
+              setSelectedAgentId(value === "all" ? "all" : Number(value));
+            }}
+            options={[
+              { value: "all", label: "Barcha agentlar" },
+              ...(Array.isArray(agents) ? agents : []).map((a) => ({ 
+                value: String(a.id), 
+                label: a.fullname || `Agent #${a.id}` 
+              }))
+            ]}
+            className="flex-1 min-w-[160px] sm:flex-initial sm:w-auto"
+          />
+          <CustomSelect
+            value={String(fillialFilter)}
+            onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
+            options={[
+              { value: "all", label: "Barcha filiallar" },
+              ...(Array.isArray(fillialsList) ? fillialsList : [])
+                .filter(f => {
+                  if (selectedMerchantId !== "all" && f.merchant_id !== Number(selectedMerchantId)) {
+                    return false;
+                  }
+                  if (selectedAgentId !== "all") {
+                    const agent = agents.find((ag: any) => ag.id === Number(selectedAgentId));
+                    if (agent && agent.fillials && agent.fillials.length > 0) {
+                      const agentFillialIds = agent.fillials.map((af: any) => af.id);
+                      return agentFillialIds.includes(f.id);
+                    }
+                    return false;
+                  }
+                  return true;
+                })
+                .map(f => ({ value: String(f.id), label: f.name }))
+            ]}
+            className="flex-1 min-w-[150px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={String(expiredMonthFilter)}
@@ -358,7 +443,7 @@ const Applications = (): JSX.Element => {
                 Filial: a.fillial?.name ?? "",
                 Yaratildi: formatDateNoSeconds(a.createdAt) ?? "",
               }));
-              exportSingleTable({ rows: apps, title: "Arizalar", dateLabel });
+              exportSingleTable({ rows: apps, title: "Arizalar (Demo)", dateLabel });
             }}
             className="flex-shrink-0 h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 px-3 sm:px-4 text-white inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap"
           >
@@ -374,7 +459,6 @@ const Applications = (): JSX.Element => {
           <button
             onClick={() => window.location.reload()}
             className="flex-shrink-0 h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-3 sm:px-4 text-white inline-flex items-center justify-center gap-2 text-sm whitespace-nowrap transition-all duration-200 active:scale-95"
-            title="Sahifani yangilash"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -384,17 +468,14 @@ const Applications = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Row 3: Slider on its own line with 1/4 width */}
       <div className="mt-4">
         <div className="w-full md:w-1/4 px-2">
-          {/* Numeric min/max inputs hidden when slider is available for a cleaner UI */}
           <Range
             values={amountRange}
             step={SLIDER_STEP}
             min={SLIDER_MIN}
             max={SLIDER_MAX}
             onChange={(vals) => {
-              // ensure proper ordering
               const a = Math.max(SLIDER_MIN, Math.min(vals[0], vals[1]));
               const b = Math.max(a, vals[1]);
               setAmountRange([a, b]);
@@ -459,16 +540,14 @@ const Applications = (): JSX.Element => {
                 onClick={async () => {
                   try {
                     setDetailLoading(true);
-                    // Fetch complete application data with all relations
-                    const fullApplication = await api.getZayavka(a.id);
+                    const fullApplication = await demoApi.getZayavka(a.id);
                     setSelected(fullApplication);
                     setOpen(true);
                   } catch (err) {
-                    // Show error message to user
+                    console.error('Error fetching application:', err);
                     setToastMessage("Ariza tafsilotlarini yuklashda xatolik yuz berdi");
                     setToastType('error');
                     setToastOpen(true);
-                    // Fallback to existing data if API call fails
                     setSelected(a);
                     setOpen(true);
                   } finally {
@@ -520,78 +599,34 @@ const Applications = (): JSX.Element => {
                       <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>;
                   })()}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden xl:table-cell">{a.fillial?.name ?? "-"}</td>
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden xl:table-cell">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="font-medium">{a.fillial?.name ?? "-"}</span>
+                    {a.user?.fullname && (
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {a.user.fullname}
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-2 sm:px-4 py-2 text-center">
                   {isApproved(a.status) ? (
                     <button
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
-                        const downloadKey = `graph_${a.id}`;
-                        setDownloadLoading(prev => ({ ...prev, [downloadKey]: true }));
-                        try {
-                          // In demo mode, use the static PDF from public folder
-                          const isDemo = location.pathname.startsWith('/demo');
-                          
-                          if (isDemo) {
-                            // Demo mode: download static graph.pdf
-                            const link = document.createElement("a");
-                            link.href = `${process.env.PUBLIC_URL}/graph.pdf`;
-                            link.download = `application_${a.id}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            link.remove();
-                          } else {
-                            // Production mode: fetch from API
-                            const response = await fetch(`https://api.premiumnasiya.uz/api/v1/app/graph/${a.id}`, {
-                              method: 'GET',
-                              headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('token')}`
-                              }
-                            });
-                            
-                            if (!response.ok) {
-                              throw new Error('Document yuklab olishda xatolik');
-                            }
-                            
-                            const blob = await response.blob();
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement("a");
-                            link.href = url;
-                            link.download = `application_${a.id}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            link.remove();
-                            URL.revokeObjectURL(url);
-                          }
-                        } catch (err) {
-                          setToastMessage("Grafikni yuklab olishda xatolik yuz berdi");
-                          setToastType('error');
-                          setToastOpen(true);
-                        } finally {
-                          setDownloadLoading(prev => ({ ...prev, [downloadKey]: false }));
-                        }
+                        setToastMessage("Demo mode: Grafik yuklab olish o'chirilgan");
+                        setToastType('info');
+                        setToastOpen(true);
                       }}
-                      disabled={downloadLoading[`graph_${a.id}`]}
-                      className={`inline-flex items-center justify-center rounded border p-2 text-sm whitespace-nowrap transition-all duration-200 ${
-                        downloadLoading[`graph_${a.id}`] 
-                          ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/20 dark:text-blue-300 cursor-not-allowed' 
-                          : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-navy-700 dark:text-gray-300'
-                      }`}
-                      title="Grafikni yuklab olish"
+                      className="inline-flex items-center justify-center rounded border border-gray-300 dark:border-gray-600 p-2 text-sm whitespace-nowrap transition-all duration-200 hover:bg-gray-100 dark:hover:bg-navy-700 dark:text-gray-300"
+                      title="Grafikni yuklab olish (Demo)"
                       type="button"
                     >
-                      {downloadLoading[`graph_${a.id}`] ? (
-                        <div className="relative">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent shadow-sm"></div>
-                          <div className="absolute inset-0 h-4 w-4 animate-ping rounded-full border border-blue-300 opacity-20"></div>
-                        </div>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <polyline points="7 10 12 15 17 10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <line x1="12" y1="15" x2="12" y2="3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <polyline points="7 10 12 15 17 10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <line x1="12" y1="15" x2="12" y2="3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </button>
                   ) : (
                     <span className="text-gray-400">-</span>
@@ -622,7 +657,7 @@ const Applications = (): JSX.Element => {
         </table>
       </div>
 
-      {/* Detail Modal */}
+      {/* Detail Modal - Same as original */}
       <DetailModal
         title={selected ? `Ariza #${selected.id}` : "Ariza tafsilotlari"}
         isOpen={open}
@@ -638,6 +673,30 @@ const Applications = (): JSX.Element => {
           </div>
         ) : selected ? (
           <div className="space-y-3">
+            <div className="flex justify-end -mt-2 mb-2">
+              <button
+                onClick={() => {
+                  const copyText = generateCopyText(selected);
+                  navigator.clipboard.writeText(copyText).then(() => {
+                    setToastMessage("Ma'lumotlar nusxalandi!");
+                    setToastType('success');
+                    setToastOpen(true);
+                  }).catch(() => {
+                    setToastMessage("Nusxalashda xatolik yuz berdi");
+                    setToastType('error');
+                    setToastOpen(true);
+                  });
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700 text-white transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" strokeWidth="2.5">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Nusxalash
+              </button>
+            </div>
+            
             <div>
               <strong className="text-gray-900 dark:text-white block mb-2">Ariza beruvchi:</strong>
               <AvatarName
@@ -652,6 +711,54 @@ const Applications = (): JSX.Element => {
             <div><strong className="text-gray-900 dark:text-white">To'lov summasi:</strong> <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(selected.payment_amount || selected.amount)}</span></div>
             <div><strong className="text-gray-900 dark:text-white">To'lov:</strong> {selected.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</div>
             <div><strong className="text-gray-900 dark:text-white">Filial:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.fillial?.name ?? "-"}</span></div>
+            
+            {(selected as any).request?.orderid && (
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5 text-blue-600" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="16" y1="13" x2="8" y2="13" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="10 9 9 9 8 9" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <strong className="text-gray-900 dark:text-white">Order ID:</strong> 
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">#{(selected as any).request.orderid}</span>
+              </div>
+            )}
+            
+            {(selected as any).request?.loanid && (
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5 text-blue-600" strokeWidth="2">
+                  <rect x="1" y="4" width="22" height="16" rx="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="1" y1="10" x2="23" y2="10" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <strong className="text-gray-900 dark:text-white">KREDIT ID:</strong> 
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">#{(selected as any).request.loanid}</span>
+              </div>
+            )}
+            
+            {selected.user && (
+              <div className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                <strong className="text-gray-900 dark:text-white block mb-2">Operator ma'lumotlari:</strong>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 dark:text-gray-400">F.I.O:</span>
+                    <span className="font-medium text-blue-700 dark:text-blue-300">{selected.user.fullname}</span>
+                  </div>
+                  {selected.user.phone && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 dark:text-gray-400">Telefon:</span>
+                      <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.user.phone)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 dark:text-gray-400">ID:</span>
+                    <span className="text-gray-700 dark:text-gray-300">#{selected.user.id}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {selected.phone2 && (
               <div><strong className="text-gray-900 dark:text-white">Qo'shimcha telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.phone2)}</span></div>
             )}
@@ -669,22 +776,6 @@ const Applications = (): JSX.Element => {
             )}
             {selected.canceled_reason && (
               <div><strong className="text-red-600 dark:text-red-400">Bekor qilish sababi:</strong> <span className="text-red-600 dark:text-red-400">{selected.canceled_reason}</span></div>
-            )}
-            {selected.user && (
-              <>
-                <div>
-                  <strong className="text-gray-900 dark:text-white block mb-2">Operator:</strong>
-                  <AvatarName
-                    image={(selected.user as any).image ?? null}
-                    name={selected.user.fullname}
-                    subtitle={`ID: ${selected.user.id}`}
-                    size="sm"
-                  />
-                </div>
-                {(selected.user as any).phone && (
-                  <div><strong className="text-gray-900 dark:text-white">Operator telefoni:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone((selected.user as any).phone)}</span></div>
-                )}
-              </>
             )}
             <div><strong className="text-gray-900 dark:text-white">Holat:</strong> {(() => { const b = appStatusBadge(selected.status); return <span className={b.className}>{b.label}</span>; })()}</div>
             <div>
@@ -714,34 +805,6 @@ const Applications = (): JSX.Element => {
                 <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Mahsulot yo'q</span>
               )}
             </div>
-            {/* To'lov jadvali (Payments) */}
-            {(selected as any).payments && Array.isArray((selected as any).payments) && (selected as any).payments.length > 0 && (
-              <div>
-                <strong className="text-gray-900 dark:text-white">To'lov jadvali:</strong>
-                <div className="mt-2 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-navy-800 p-2">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-gray-500 dark:text-gray-400">
-                        <th className="px-2 py-1">Sana</th>
-                        <th className="px-2 py-1">Asosiy summa</th>
-                        <th className="px-2 py-1">Jami to'lov</th>
-                        <th className="px-2 py-1">Qoldiq qarz</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-700 dark:text-gray-300">
-                      {(selected as any).payments.map((payment: any, idx: number) => (
-                        <tr key={idx} className="border-t border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-navy-700">
-                          <td className="px-2 py-1">{payment.date || '-'}</td>
-                          <td className="px-2 py-1 text-blue-600 dark:text-blue-400">{formatMoney(payment.prAmount || 0)}</td>
-                          <td className="px-2 py-1 text-green-600 dark:text-green-400">{formatMoney(payment.totalAmount || 0)}</td>
-                          <td className="px-2 py-1 text-orange-600 dark:text-orange-400">{formatMoney(payment.remainingMainDebt || 0)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div className="text-center py-4 text-gray-500 dark:text-gray-400">
@@ -765,4 +828,4 @@ const Applications = (): JSX.Element => {
   );
 };
 
-export default Applications;
+export default DemoApplications;

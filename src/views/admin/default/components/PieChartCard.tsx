@@ -3,7 +3,9 @@ import PieChart from "components/charts/PieChart";
 import { pieChartOptions } from "variables/charts";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { isApproved, isConfirmed, isRejected, isPending } from "lib/formatters";
 
 interface PieChartCardProps {
@@ -25,6 +27,12 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = React.useMemo(() => {
+    const isDemo = location.pathname.startsWith('/demo');
+    return isDemo ? demoApi : apiReal;
+  }, [location.pathname]);
+  
   const [timePeriod, setTimePeriod] = React.useState("daily");
   const [statusDistribution, setStatusDistribution] = React.useState({
     approved: 0,
@@ -126,7 +134,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
     };
 
     loadStatusData();
-  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
+  }, [api, timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
 
   const approvedPercent = statusDistribution.total > 0 
     ? Math.round((statusDistribution.approved / statusDistribution.total) * 100) 

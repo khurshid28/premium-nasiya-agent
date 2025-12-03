@@ -6,7 +6,9 @@ import AvatarName from "components/AvatarName";
 import Pagination from "components/pagination";
 import PasswordModal from "components/PasswordModal";
 import CustomSelect from "components/dropdown/CustomSelect";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { formatPhone, statusBadge, formatDateShort } from "lib/formatters";
 import { exportSingleTable } from "lib/exportExcel";
 
@@ -27,10 +29,20 @@ type User = {
 
 
 const Users = (): JSX.Element => {
+  const location = useLocation();
+  const api = React.useMemo(() => {
+    const isDemo = location.pathname.startsWith('/demo');
+    console.log('Users component - pathname:', location.pathname, 'isDemo:', isDemo);
+    console.log('Users component - using API:', isDemo ? 'demoApi' : 'apiReal');
+    return isDemo ? demoApi : apiReal;
+  }, [location.pathname]);
+
   const [users, setUsers] = React.useState<User[]>([]);
   const [search, setSearch] = React.useState("");
   const [fillials, setFillials] = React.useState<any[]>([]);
   const [fillialFilter, setFillialFilter] = React.useState<number | "all">("all");
+  const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
   
   // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
@@ -54,9 +66,10 @@ const Users = (): JSX.Element => {
         u.fullname?.toLowerCase().includes(s) || 
         u.phone?.toLowerCase().includes(s);
       const matchesFillial = fillialFilter === "all" || u.fillial?.id === fillialFilter;
-      return matchesSearch && matchesFillial;
+      const matchesMerchant = selectedMerchantId === "all" || u.merchant?.id === Number(selectedMerchantId);
+      return matchesSearch && matchesFillial && matchesMerchant;
     });
-  }, [users, search, fillialFilter]);
+  }, [users, search, fillialFilter, selectedMerchantId]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -64,7 +77,7 @@ const Users = (): JSX.Element => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, fillialFilter]);
+  }, [search, fillialFilter, selectedMerchantId]);
 
   // Paginate filtered data
   const pageData = React.useMemo(() => {
@@ -98,16 +111,24 @@ const Users = (): JSX.Element => {
       abortController.abort();
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [api]);
 
   React.useEffect(() => {
     let mounted = true;
-    api.listFillials({}).then((res) => {
+    Promise.all([
+      api.listFillials({}),
+      (api as any).listMerchants({ page: 1, pageSize: 100 })
+    ]).then(([filialsRes, merchantsRes]) => {
       if (!mounted) return;
-      setFillials(res.items || []);
+      setFillials(filialsRes.items || []);
+      setMerchants(merchantsRes.items || []);
+    }).catch(() => {
+      if (!mounted) return;
+      setFillials([]);
+      setMerchants([]);
     });
     return () => { mounted = false; };
-  }, []);
+  }, [api]);
 
   return (
     <div>
@@ -133,20 +154,43 @@ const Users = (): JSX.Element => {
         {/* Buttons and filters row */}
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { 
-            setToastType("error");
-            setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-            setToastOpen(true);
+            if (location.pathname.startsWith('/demo')) {
+              setEditInitial(null);
+              setEditOpen(true);
+            } else {
+              setToastType("error");
+              setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+              setToastOpen(true);
+            }
           }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 text-sm whitespace-nowrap">
             <span className="hidden sm:inline">Operator Qo'shish</span>
             <span className="sm:hidden">+ Operator</span>
           </button>
           
           <CustomSelect
+            value={String(selectedMerchantId)}
+            onChange={(value) => {
+              setSelectedMerchantId(value === "all" ? "all" : Number(value));
+              setFillialFilter("all");
+            }}
+            options={[
+              { value: "all", label: "Barcha merchantlar" },
+              ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+                value: String(m.id), 
+                label: m.name || `Merchant #${m.id}` 
+              }))
+            ]}
+            className="min-w-[120px] sm:min-w-[160px] flex-1 sm:flex-none"
+          />
+          
+          <CustomSelect
             value={String(fillialFilter)}
             onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
             options={[
               { value: "all", label: "Barcha filiallar" },
-              ...(Array.isArray(fillials) ? fillials : []).map(f => ({ value: String(f.id), label: f.name }))
+              ...(Array.isArray(fillials) ? fillials : [])
+                .filter(f => selectedMerchantId === "all" || f.merchant_id === Number(selectedMerchantId))
+                .map(f => ({ value: String(f.id), label: f.name }))
             ]}
             className="min-w-[120px] sm:min-w-[150px] flex-1 sm:flex-none"
           />
@@ -289,14 +333,25 @@ const Users = (): JSX.Element => {
                   <div><strong>Work status:</strong> {(() => { const b = statusBadge(selected.work_status); return <span className={b.className}>{b.label}</span>; })()}</div>
                   <div className="mt-4 flex gap-2">
                     <button className="rounded bg-blue-600 px-3 py-1 text-white" onClick={() => { 
-                      setToastType("error");
-                      setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                      setToastOpen(true);
+                      if (location.pathname.startsWith('/demo')) {
+                        setEditInitial(selected);
+                        setEditOpen(true);
+                        setOpen(false);
+                      } else {
+                        setToastType("error");
+                        setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+                        setToastOpen(true);
+                      }
                     }}>Tahrirlash</button>
                     <button className="rounded bg-yellow-500 px-3 py-1 text-white" onClick={() => { 
-                      setToastType("error");
-                      setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                      setToastOpen(true);
+                      if (location.pathname.startsWith('/demo')) {
+                        setPasswordOpen(true);
+                        setOpen(false);
+                      } else {
+                        setToastType("error");
+                        setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+                        setToastOpen(true);
+                      }
                     }}>Parolni o'zgartirish</button>
                   </div>
                 </div>
@@ -304,6 +359,13 @@ const Users = (): JSX.Element => {
             </DetailModal>
             <PasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} onSave={async (newPassword) => {
               if (!selected) return;
+              if (location.pathname.startsWith('/demo')) {
+                setPasswordOpen(false);
+                setToastType('success');
+                setToastMessage('Parol o\'zgartirildi (Demo)');
+                setToastOpen(true);
+                return;
+              }
               await api.updateUser(selected.id, { password: newPassword });
               setToastType('success');
               setToastMessage("Password updated");
@@ -315,6 +377,14 @@ const Users = (): JSX.Element => {
               initial={editInitial}
               type="user"
               onSave={async (payload) => {
+                if (location.pathname.startsWith('/demo')) {
+                  setEditOpen(false);
+                  setEditInitial(null);
+                  setToastType('success');
+                  setToastMessage(editInitial ? 'Operator tahrirlandi (Demo)' : 'Operator qo\'shildi (Demo)');
+                  setToastOpen(true);
+                  return;
+                }
                 if (editInitial && editInitial.id) {
                   await api.updateUser(editInitial.id, payload);
                 } else {

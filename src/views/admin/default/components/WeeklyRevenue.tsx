@@ -4,7 +4,9 @@ import BarChart from "components/charts/BarChart";
 import {
   barChartOptionsWeeklyRevenue,
 } from "variables/charts";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { MdBarChart } from "react-icons/md";
 import { isApproved, isRejected, isLimit } from "lib/formatters";
 
@@ -43,6 +45,9 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+  
   const [chartData, setChartData] = React.useState([{
     name: "Tugatilgan",
     data: [0, 0, 0, 0, 0, 0, 0],

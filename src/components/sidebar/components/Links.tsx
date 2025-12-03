@@ -21,11 +21,17 @@ export const SidebarLinks = (props: { routes: RoutesType[]; onClose?: React.Mous
   };
 
   const createLinks = (routes: RoutesType[]) => {
+    // Determine which layout to use based on current URL
+    const isDemo = location.pathname.startsWith('/demo');
+    const targetLayout = isDemo ? '/demo' : '/agent';
+    
     return routes.map((route, index) => {
       // Skip hidden routes (e.g., Profile removed from sidebar)
       // @ts-ignore allow optional hidden flag on route objects
       if ((route as any).hidden) return null;
-      if (route.layout === "/agent") {
+      
+      // Only show routes for the current layout
+      if (route.layout === targetLayout) {
         return (
           <Link key={index} to={route.layout + "/" + route.path} onClick={handleLinkClick}>
             <div className="relative mb-3 flex hover:cursor-pointer">

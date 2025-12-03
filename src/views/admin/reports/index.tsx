@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Card from "components/card";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { formatMoney } from "lib/formatters";
 import { MdCalendarMonth, MdAttachMoney, MdCheckCircle, MdShoppingCart } from "react-icons/md";
 import Pagination from "components/pagination";
@@ -18,6 +20,12 @@ interface MonthlyReport {
 }
 
 const ReportsPage = () => {
+  const location = useLocation();
+  const api = React.useMemo(() => {
+    const isDemo = location.pathname.startsWith('/demo');
+    return isDemo ? demoApi : apiReal;
+  }, [location.pathname]);
+
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -25,17 +33,30 @@ const ReportsPage = () => {
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [fillialFilter, setFillialFilter] = useState<string>("all");
   const [fillials, setFillials] = useState<any[]>([]);
+  const [merchants, setMerchants] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = useState<number | "all">("all");
+  const [selectedAgentId, setSelectedAgentId] = useState<number | "all">("all");
 
   useEffect(() => {
     loadFillials();
-  }, []);
+  }, [api]);
 
   const loadFillials = async () => {
     try {
-      const response = await api.listFillials({ page: 1, pageSize: 1000 });
-      setFillials(response?.items || []);
+      const [filialsRes, merchantsRes, agentsRes] = await Promise.all([
+        api.listFillials({ page: 1, pageSize: 1000 }),
+        (api as any).listMerchants({ page: 1, pageSize: 100 }),
+        (api as any).listAgents({ page: 1, pageSize: 100 })
+      ]);
+      setFillials(filialsRes?.items || []);
+      setMerchants(merchantsRes?.items || []);
+      setAgents(agentsRes?.items || []);
     } catch (error) {
-      console.error("Error loading fillials:", error);
+      console.error("Error loading data:", error);
+      setFillials([]);
+      setMerchants([]);
+      setAgents([]);
     }
   };
 
@@ -50,6 +71,29 @@ const ReportsPage = () => {
 
       applications.forEach((app: any) => {
         if (!app.createdAt) return;
+
+        // Filter by merchant if selected (through fillial)
+        if (selectedMerchantId !== "all") {
+          const appFillialId = app.fillial?.id || app.fillialId;
+          const fillialObj = fillials.find(f => f.id === appFillialId);
+          if (!fillialObj || fillialObj.merchant_id !== Number(selectedMerchantId)) {
+            return;
+          }
+        }
+
+        // Filter by agent if selected (through fillial)
+        if (selectedAgentId !== "all") {
+          const agent = agents.find((a: any) => a.id === Number(selectedAgentId));
+          if (agent && agent.fillials) {
+            const agentFillialIds = agent.fillials.map((f: any) => f.id);
+            const appFillialId = app.fillial?.id || app.fillialId;
+            if (!agentFillialIds.includes(appFillialId)) {
+              return;
+            }
+          } else {
+            return;
+          }
+        }
 
         // Filter by fillial if selected
         if (fillialFilter !== "all") {
@@ -81,7 +125,8 @@ const ReportsPage = () => {
 
         if (isCompleted) {
           monthlyData[monthKey].completedApplications += 1;
-          monthlyData[monthKey].totalProfit += app.payment_amount || app.amount || 0;
+          const paymentAmount = parseFloat(app.payment_amount) || parseFloat(app.amount) || 0;
+          monthlyData[monthKey].totalProfit += paymentAmount;
           
           // Count products and their total amount
           if (app.products && Array.isArray(app.products)) {
@@ -111,7 +156,7 @@ const ReportsPage = () => {
   useEffect(() => {
     loadReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillialFilter]);
+  }, [api, fillialFilter, selectedMerchantId, selectedAgentId]);
 
   // Get unique years for filter
   const availableYears = Array.from(new Set(reports.map(r => r.year))).sort((a, b) => b - a);
@@ -173,6 +218,37 @@ const ReportsPage = () => {
       {/* Filters and Action Buttons in one row */}
       <div className="flex flex-wrap gap-2 mb-6">
         <CustomSelect
+          value={String(selectedMerchantId)}
+          onChange={(value) => {
+            setSelectedMerchantId(value === "all" ? "all" : Number(value));
+            setFillialFilter("all");
+            setPage(1);
+          }}
+          options={[
+            { value: "all", label: "Barcha merchantlar" },
+            ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+              value: String(m.id), 
+              label: m.name || `Merchant #${m.id}` 
+            }))
+          ]}
+          className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
+        />
+        <CustomSelect
+          value={String(selectedAgentId)}
+          onChange={(value) => {
+            setSelectedAgentId(value === "all" ? "all" : Number(value));
+            setPage(1);
+          }}
+          options={[
+            { value: "all", label: "Barcha agentlar" },
+            ...(Array.isArray(agents) ? agents : []).map((a) => ({ 
+              value: String(a.id), 
+              label: a.fullname || `Agent #${a.id}` 
+            }))
+          ]}
+          className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
+        />
+        <CustomSelect
           value={fillialFilter}
           onChange={(value) => {
             setFillialFilter(value);
@@ -180,7 +256,24 @@ const ReportsPage = () => {
           }}
           options={[
             { value: "all", label: "Barcha filiallar" },
-            ...fillials.map(f => ({ value: f.id.toString(), label: f.name }))
+            ...fillials
+              .filter(f => {
+                // Merchant filter
+                if (selectedMerchantId !== "all" && f.merchant_id !== Number(selectedMerchantId)) {
+                  return false;
+                }
+                // Agent filter
+                if (selectedAgentId !== "all") {
+                  const agent = agents.find((a: any) => a.id === Number(selectedAgentId));
+                  if (agent && agent.fillials && agent.fillials.length > 0) {
+                    const agentFillialIds = agent.fillials.map((af: any) => af.id);
+                    return agentFillialIds.includes(f.id);
+                  }
+                  return false;
+                }
+                return true;
+              })
+              .map(f => ({ value: f.id.toString(), label: f.name }))
           ]}
           className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
         />
